@@ -15,6 +15,10 @@ import { documentRoutes } from './routes/documents.js';
 import { customerRoutes } from './routes/customers.js';
 import { contentRoutes } from './routes/content.js';
 import { auditRoutes } from './routes/audit.js';
+import { taxReportRoutes } from './routes/tax-report.js';
+import { agendaRoutes } from './routes/agenda.js';
+import { invoiceRoutes } from './routes/invoices.js';
+import { legalRoutes } from './routes/legal.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -48,6 +52,12 @@ export function buildApp(config: ServerConfig, db?: DB): FastifyInstance {
   app.register(customerRoutes);
   app.register(contentRoutes);
   app.register(auditRoutes);
+
+  // 便利機能(確定申告/今日のやること/請求書/規約生成)
+  app.register(taxReportRoutes);
+  app.register(agendaRoutes);
+  app.register(invoiceRoutes);
+  app.register(legalRoutes);
 
   // ビルド済みSPAがあれば静的配信(オフライン動作)。無ければAPIのみ。
   if (existsSync(config.webDistDir)) {

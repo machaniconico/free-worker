@@ -23,6 +23,10 @@ export * from './services/documents.js';
 export * from './services/customers.js';
 export * from './services/content.js';
 export * from './services/audit-query.js';
+export * from './services/legal-generator.js';
+export * from './services/tax-report.js';
+export * from './services/agenda.js';
+export * from './services/invoice-view.js';
 
 // シード
 export * from './seed/checklist.js';
