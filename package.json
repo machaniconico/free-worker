@@ -1,0 +1,31 @@
+{
+  "name": "free-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "個人事業主・フリーランス(デジタルコンテンツ主体)向けローカルファースト業務支援アプリ。クラウドAI非依存。",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "packages/core",
+    "packages/server",
+    "packages/web"
+  ],
+  "scripts": {
+    "build": "npm run build -w @free-worker/core && npm run build -w @free-worker/server && npm run build -w @free-worker/web",
+    "build:app": "npm run build -w @free-worker/core && npm run build -w @free-worker/web && npm run build -w @free-worker/server",
+    "dev": "npm run dev -w @free-worker/server",
+    "dev:web": "npm run dev -w @free-worker/web",
+    "start": "node packages/server/dist/main.js",
+    "typecheck": "tsc -b packages/core packages/server packages/web --pretty",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint . --ext .ts,.tsx"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

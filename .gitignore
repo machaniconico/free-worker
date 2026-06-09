@@ -1,0 +1,29 @@
+node_modules/
+dist/
+*.tsbuildinfo
+coverage/
+
+# ローカルデータ(顧客データ・DB・添付・バックアップは絶対にコミットしない)
+/data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+/backups/
+/attachments/
+
+# 環境・秘密
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+
+# 作業用展開物
+_pack_inspect/
+
+# OMC / fullralph 状態は保持(audit trail)。ログのみ無視。
+.omc/logs/

@@ -1,0 +1,117 @@
+/**
+ * 依存ゼロの CSV パーサ/シリアライザ(RFC4180 準拠寄り)。
+ * - BOM を除去して読む(出典パックの CSV は UTF-8 BOM 付き)。
+ * - 引用符内のカンマ・改行・"" エスケープに対応。
+ * - 出力は Excel で文字化けしないよう既定で BOM を付与可能。
+ */
+
+export type CsvRow = Record<string, string>;
+
+/** CSV テキストを行オブジェクト配列にパースする(1行目をヘッダとみなす)。 */
+export function parseCsv(text: string): CsvRow[] {
+  const records = parseCsvRaw(text);
+  if (records.length === 0) return [];
+  const header = records[0]!;
+  const rows: CsvRow[] = [];
+  for (let i = 1; i < records.length; i++) {
+    const cells = records[i]!;
+    // 完全な空行はスキップ
+    if (cells.length === 1 && cells[0] === '') continue;
+    const row: CsvRow = {};
+    for (let c = 0; c < header.length; c++) {
+      row[header[c]!] = cells[c] ?? '';
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
+/** CSV テキストを生の2次元配列にパースする。 */
+export function parseCsvRaw(input: string): string[][] {
+  const text = stripBom(input);
+  const rows: string[][] = [];
+  let field = '';
+  let row: string[] = [];
+  let inQuotes = false;
+  let i = 0;
+
+  while (i < text.length) {
+    const ch = text[i]!;
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i += 2;
+          continue;
+        }
+        inQuotes = false;
+        i++;
+        continue;
+      }
+      field += ch;
+      i++;
+      continue;
+    }
+    if (ch === '"') {
+      inQuotes = true;
+      i++;
+      continue;
+    }
+    if (ch === ',') {
+      row.push(field);
+      field = '';
+      i++;
+      continue;
+    }
+    if (ch === '\r') {
+      i++;
+      continue;
+    }
+    if (ch === '\n') {
+      row.push(field);
+      rows.push(row);
+      field = '';
+      row = [];
+      i++;
+      continue;
+    }
+    field += ch;
+    i++;
+  }
+  // 末尾フィールド/行
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows;
+}
+
+export interface SerializeOptions {
+  /** 出力カラム順。未指定なら最初の行のキー順。 */
+  columns?: string[];
+  /** Excel 互換のため先頭に UTF-8 BOM を付ける。既定 true。 */
+  bom?: boolean;
+}
+
+/** 行オブジェクト配列を CSV テキストにシリアライズする。 */
+export function serializeCsv(rows: ReadonlyArray<CsvRow>, opts: SerializeOptions = {}): string {
+  const columns = opts.columns ?? (rows.length > 0 ? Object.keys(rows[0]!) : []);
+  const bom = opts.bom ?? true;
+  const lines: string[] = [];
+  lines.push(columns.map(escapeCell).join(','));
+  for (const row of rows) {
+    lines.push(columns.map((col) => escapeCell(row[col] ?? '')).join(','));
+  }
+  return (bom ? '﻿' : '') + lines.join('\r\n');
+}
+
+function escapeCell(value: string): string {
+  if (/[",\r\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+function stripBom(text: string): string {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
