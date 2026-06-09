@@ -1,0 +1,14 @@
+Implemented US-005 in the four allowed files only:
+
+- Added core expense service with CRUD, monthly/category summaries, CSV export/import, integer yen validation, and audit logs.
+- Added `/api/expenses` route module with CRUD, summary, CSV export/import endpoints.
+- Added focused core and server route tests.
+
+Verified:
+
+- `npx vitest run packages/core/test/expenses.test.ts packages/server/test/expenses.route.test.ts` passed.
+- `npm run typecheck` passed.
+- `npm run test` passed: 15 files, 48 tests.
+- `app.ts` / `main.tsx` were not touched.
+
+Note: `git add -N` could not run because `.git/index.lock` could not be created: `.git` is read-only in this sandbox. The four new files remain present and untracked.
