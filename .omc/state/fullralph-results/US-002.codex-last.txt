@@ -1,0 +1,23 @@
+US-002 実装完了です。変更は指定5ファイルのみです。
+
+実装内容:
+- `packages/core/src/services/obligations.ts`
+  - CRUD、`updateObligationStatus`、`listWithDueStatus(today)` を追加
+  - create/update/delete は `audit_logs` に記録
+  - delete は削除前に監査ログを記録
+- `packages/core/src/seed/checklist.ts`
+  - `docs/reference/action_checklist.csv` を `parseCsv` で読み込み
+  - `source_id` に `S1..S15` を紐付け
+  - `category + title` で冪等投入、同一内容なら no-op
+- `packages/server/src/routes/obligations.ts`
+  - `/api/obligations` CRUD
+  - 一覧は `dueStatus` 付き
+  - `/api/obligations/:id/status` で状態更新
+- core/server の対象テストを追加
+
+検証:
+- `npm run typecheck` passed
+- `npm run test` passed: 8 files, 27 tests
+- `app.ts` / `main.tsx` は触っていません
+
+補足: `git add -N` は実行しましたが、`.git/index.lock` を作れず `Read-only file system` で失敗しました。対象5ファイルは未追跡として存在しています。
