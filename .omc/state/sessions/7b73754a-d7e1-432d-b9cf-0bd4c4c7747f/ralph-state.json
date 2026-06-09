@@ -2,12 +2,12 @@
   "active": true,
   "session_id": "7b73754a-d7e1-432d-b9cf-0bd4c4c7747f",
   "project_path": "/mnt/d/workspace/free-worker",
-  "iteration": 1,
+  "iteration": 8,
   "max_iterations": 200,
   "current_phase": "fullralph",
   "prompt": "fullralph: 個人事業主向けローカル業務支援アプリ",
   "started_at": "2026-06-09T12:05:51.863Z",
-  "last_checked_at": "2026-06-09T12:05:51.863Z",
-  "updated_at": "2026-06-09T12:05:51.863Z",
+  "last_checked_at": "2026-06-09T13:05:30.020Z",
+  "updated_at": "2026-06-09T13:05:30.020Z",
   "armed_by": "fullralph"
 }

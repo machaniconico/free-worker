@@ -5,6 +5,16 @@ import { bootstrap, type DB } from '@free-worker/core';
 import { type ServerConfig } from './config.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerSettingsRoutes } from './routes/settings.js';
+import { profileRoutes } from './routes/profile.js';
+import { obligationRoutes } from './routes/obligations.js';
+import { productRoutes } from './routes/products.js';
+import { salesRoutes } from './routes/sales.js';
+import { expenseRoutes } from './routes/expenses.js';
+import { backupRoutes } from './routes/backup.js';
+import { documentRoutes } from './routes/documents.js';
+import { customerRoutes } from './routes/customers.js';
+import { contentRoutes } from './routes/content.js';
+import { auditRoutes } from './routes/audit.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -26,6 +36,18 @@ export function buildApp(config: ServerConfig, db?: DB): FastifyInstance {
 
   app.register(registerHealthRoutes);
   app.register(registerSettingsRoutes, { prefix: '/api/settings' });
+
+  // 各EPICのルート(すべて自己内包で /api/* を登録)
+  app.register(profileRoutes);
+  app.register(obligationRoutes);
+  app.register(productRoutes);
+  app.register(salesRoutes);
+  app.register(expenseRoutes);
+  app.register(backupRoutes);
+  app.register(documentRoutes);
+  app.register(customerRoutes);
+  app.register(contentRoutes);
+  app.register(auditRoutes);
 
   // ビルド済みSPAがあれば静的配信(オフライン動作)。無ければAPIのみ。
   if (existsSync(config.webDistDir)) {
