@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"npm run build -w @free-worker/web 2>&1\",\"timeout\":120000}",
+  "error": "Exit code 2\n\n> @free-worker/web@0.1.0 build\n> tsc --noEmit -p tsconfig.json && vite build\n\nsrc/pages/DocumentsPage.tsx(133,19): error TS2322: Type 'unknown' is not assignable to type 'string | number | readonly string[] | undefined'.\nsrc/pages/DocumentsPage.tsx(139,30): error TS2322: Type '{}' is not assignable to type 'string | number | readonly string[] | undefined'.\nsrc/pages/DocumentsPage.tsx(144,13): error TS2322: Type '{}' is not assignable to type 'string | number | readonly string[] | un...",
+  "timestamp": "2026-06-09T13:11:39.653Z",
+  "retry_count": 1
+}

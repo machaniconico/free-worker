@@ -1,7 +1,17 @@
 {
-  "agents": [],
-  "total_spawned": 0,
-  "total_completed": 0,
+  "agents": [
+    {
+      "agent_id": "af56224d5f8018fe9",
+      "agent_type": "designer",
+      "started_at": "2026-06-09T13:06:44.895Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-06-09T13:13:56.194Z",
+      "duration_ms": 431299
+    }
+  ],
+  "total_spawned": 1,
+  "total_completed": 9,
   "total_failed": 0,
-  "last_updated": "2026-06-09T13:00:33.992Z"
+  "last_updated": "2026-06-09T13:13:56.303Z"
 }

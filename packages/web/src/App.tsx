@@ -2,6 +2,17 @@ import { NavLink, Outlet } from 'react-router-dom';
 
 const NAV: ReadonlyArray<{ to: string; label: string; end?: boolean }> = [
   { to: '/', label: 'ホーム', end: true },
+  { to: '/dashboard', label: 'ダッシュボード' },
+  { to: '/profile', label: '事業プロフィール' },
+  { to: '/checklist', label: 'チェックリスト' },
+  { to: '/products', label: '商品管理' },
+  { to: '/sales', label: '売上・請求' },
+  { to: '/expenses', label: '経費管理' },
+  { to: '/documents', label: '文書・規約' },
+  { to: '/customers', label: '顧客・同意' },
+  { to: '/content', label: 'コンテンツ' },
+  { to: '/backup', label: 'バックアップ' },
+  { to: '/audit', label: '監査ログ' },
   { to: '/settings', label: '設定' },
 ];
 
