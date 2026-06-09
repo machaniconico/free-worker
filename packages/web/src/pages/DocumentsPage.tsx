@@ -10,6 +10,20 @@ interface Doc {
   createdAt?: string;
 }
 
+interface LegalDraft {
+  docType: string;
+  title: string;
+  versionLabel: string;
+  body: string;
+  sourceIds: string[];
+  placeholderCount: number;
+}
+
+interface GenerateResponse {
+  draft: LegalDraft;
+  saved?: boolean;
+}
+
 const DOC_TYPES: ReadonlyArray<{ value: string; label: string }> = [
   { value: 'tokushoho', label: '特定商取引法表記' },
   { value: 'terms', label: '利用規約' },
@@ -17,6 +31,12 @@ const DOC_TYPES: ReadonlyArray<{ value: string; label: string }> = [
   { value: 'contract_template', label: '契約書テンプレート' },
   { value: 'license', label: 'ライセンス' },
   { value: 'other', label: 'その他' },
+];
+
+const GENERATE_DOC_TYPES: ReadonlyArray<{ value: 'tokushoho' | 'terms' | 'privacy'; label: string }> = [
+  { value: 'tokushoho', label: '特定商取引法表記' },
+  { value: 'terms', label: '利用規約' },
+  { value: 'privacy', label: 'プライバシーポリシー' },
 ];
 
 const EMPTY: Omit<Doc, 'id'> = { docType: 'terms', versionLabel: '', body: '' };
@@ -29,6 +49,14 @@ export function DocumentsPage() {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [publishMsg, setPublishMsg] = useState<string | null>(null);
+
+  // Legal draft generation state
+  const [genDocType, setGenDocType] = useState<'tokushoho' | 'terms' | 'privacy'>('tokushoho');
+  const [genDraft, setGenDraft] = useState<LegalDraft | null>(null);
+  const [genLoading, setGenLoading] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+  const [genSaved, setGenSaved] = useState(false);
+  const [genSaving, setGenSaving] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -77,6 +105,39 @@ export function DocumentsPage() {
 
   const docTypeLabel = (v: string) => DOC_TYPES.find((t) => t.value === v)?.label ?? v;
 
+  // Generate draft from profile
+  const generateDraft = async () => {
+    setGenLoading(true);
+    setGenError(null);
+    setGenDraft(null);
+    setGenSaved(false);
+    try {
+      const res = await api.post<GenerateResponse>('/api/legal/generate', { docType: genDocType });
+      setGenDraft(res.draft);
+    } catch (e: unknown) {
+      setGenError(String(e));
+    } finally {
+      setGenLoading(false);
+    }
+  };
+
+  // Save draft to documents
+  const saveDraft = async () => {
+    if (!genDraft) return;
+    setGenSaving(true);
+    setGenError(null);
+    try {
+      await api.post<GenerateResponse>('/api/legal/generate', { docType: genDocType, save: true });
+      setGenSaved(true);
+      setTimeout(() => setGenSaved(false), 3000);
+      load();
+    } catch (e: unknown) {
+      setGenError(String(e));
+    } finally {
+      setGenSaving(false);
+    }
+  };
+
   return (
     <div>
       <h1>文書・規約管理</h1>
@@ -86,6 +147,80 @@ export function DocumentsPage() {
       {publishMsg && <p style={{ color: 'var(--accent-2)' }}>{publishMsg}</p>}
       {loading && <p style={{ color: 'var(--muted)' }}>読み込み中…</p>}
 
+      {/* ── 草案生成セクション ── */}
+      <section className="card">
+        <h2>プロフィールから草案生成</h2>
+        <p style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 12 }}>
+          登録済みの事業プロフィール情報を元に文書の草案を自動生成します。
+          生成後にプレビューで確認し、draft として保存できます。
+        </p>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <select
+            value={genDocType}
+            onChange={(e) => {
+              setGenDocType(e.target.value as 'tokushoho' | 'terms' | 'privacy');
+              setGenDraft(null);
+              setGenSaved(false);
+            }}
+            style={{
+              padding: '8px 10px', borderRadius: 8,
+              border: '1px solid var(--border)', background: 'var(--panel-2)', color: 'var(--text)',
+            }}
+          >
+            {GENERATE_DOC_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+          <button
+            className="btn primary"
+            onClick={() => void generateDraft()}
+            disabled={genLoading}
+          >
+            {genLoading ? '生成中…' : '草案を生成'}
+          </button>
+        </div>
+
+        {genError && <p className="error" style={{ marginTop: 8 }}>{genError}</p>}
+
+        {genDraft && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+              <strong>{genDraft.title}</strong>
+              <span style={{ fontSize: 12, color: 'var(--muted)' }}>{genDraft.versionLabel}</span>
+              {genDraft.placeholderCount > 0 && (
+                <span className="badge badge-warn">
+                  要記入 {genDraft.placeholderCount}件
+                </span>
+              )}
+              {genDraft.placeholderCount === 0 && (
+                <span className="badge badge-ok">プレースホルダーなし</span>
+              )}
+            </div>
+            <textarea
+              readOnly
+              value={genDraft.body}
+              rows={10}
+              style={{
+                width: '100%', padding: '8px 10px', borderRadius: 8,
+                border: '1px solid var(--border)', background: 'var(--panel-2)',
+                color: 'var(--text)', fontFamily: 'inherit', resize: 'vertical', fontSize: 13,
+              }}
+            />
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button
+                className="btn primary"
+                onClick={() => void saveDraft()}
+                disabled={genSaving || genSaved}
+              >
+                {genSaving ? '保存中…' : 'draftとして保存'}
+              </button>
+              {genSaved && <span className="saved">保存しました</span>}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* ── 文書一覧 ── */}
       {docs.length > 0 && (
         <section className="card">
           <h2>文書一覧</h2>
@@ -125,6 +260,7 @@ export function DocumentsPage() {
         </section>
       )}
 
+      {/* ── 新規作成 / 編集フォーム ── */}
       <section className="card">
         <h2>{editId ? '文書編集' : '新規文書作成'}</h2>
         <label className="field">

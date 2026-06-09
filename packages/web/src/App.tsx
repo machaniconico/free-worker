@@ -13,6 +13,7 @@ const NAV: ReadonlyArray<{ to: string; label: string; end?: boolean }> = [
   { to: '/content', label: 'コンテンツ' },
   { to: '/backup', label: 'バックアップ' },
   { to: '/audit', label: '監査ログ' },
+  { to: '/tax', label: '確定申告' },
   { to: '/settings', label: '設定' },
 ];
 

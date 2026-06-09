@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 
 interface Order {
@@ -116,6 +117,7 @@ export function SalesPage() {
                 <th>税込金額</th>
                 <th>消費税</th>
                 <th>状態</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -126,6 +128,13 @@ export function SalesPage() {
                   <td>{o.amountTaxIncluded != null ? o.amountTaxIncluded.toLocaleString('ja-JP') + '円' : '—'}</td>
                   <td>{o.taxAmount != null ? o.taxAmount.toLocaleString('ja-JP') + '円' : '—'}</td>
                   <td><span className="badge badge-default">{String(o.status ?? '—')}</span></td>
+                  <td>
+                    {o.id && (
+                      <Link to={`/invoice/${o.id}`} className="btn" style={{ fontSize: 12, padding: '4px 10px' }}>
+                        請求書
+                      </Link>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

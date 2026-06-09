@@ -25,6 +25,19 @@ interface Obligation {
   dueStatus?: string;
 }
 
+interface AgendaAlert {
+  kind: 'obligation' | 'task' | 'document_review' | 'backup';
+  severity: 'overdue' | 'due_soon' | 'info';
+  title: string;
+  dueDate?: string;
+  ref: object;
+}
+
+interface Agenda {
+  today: string;
+  alerts: AgendaAlert[];
+}
+
 function fmtYen(n: number) {
   return n.toLocaleString('ja-JP') + '円';
 }
@@ -34,13 +47,46 @@ function currentMonth() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const KIND_LABELS: Record<AgendaAlert['kind'], string> = {
+  obligation: '法令期限',
+  task: 'タスク',
+  document_review: '文書見直し',
+  backup: 'バックアップ',
+};
+
+function severityBadgeClass(s: AgendaAlert['severity']) {
+  if (s === 'overdue') return 'badge badge-danger';
+  if (s === 'due_soon') return 'badge badge-warn';
+  return 'badge badge-default';
+}
+
+function severityLabel(s: AgendaAlert['severity']) {
+  if (s === 'overdue') return '期限超過';
+  if (s === 'due_soon') return '期限間近';
+  return '情報';
+}
+
 export function DashboardPage() {
   const [month, setMonth] = useState(currentMonth());
   const [sales, setSales] = useState<SalesSummary | null>(null);
   const [expenses, setExpenses] = useState<ExpensesSummary | null>(null);
   const [obligations, setObligations] = useState<Obligation[]>([]);
+  const [agenda, setAgenda] = useState<Agenda | null>(null);
+  const [agendaError, setAgendaError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Load agenda once on mount
+  useEffect(() => {
+    api.get<Agenda>(`/api/agenda?today=${todayStr()}`)
+      .then(setAgenda)
+      .catch((e: unknown) => setAgendaError(String(e)));
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -69,7 +115,64 @@ export function DashboardPage() {
       <h1>ダッシュボード</h1>
       <p className="lead">月次KPIと期限アラートを一覧します。</p>
 
-      <div className="field" style={{ marginTop: 16 }}>
+      {/* ── 今日のやること ── */}
+      <section className="card" style={{ marginTop: 18 }}>
+        <h2>今日のやること</h2>
+        {agendaError && (
+          <p style={{ color: 'var(--muted)', fontSize: 13 }}>アラート取得エラー: {agendaError}</p>
+        )}
+        {!agendaError && agenda === null && (
+          <p style={{ color: 'var(--muted)', fontSize: 13 }}>読み込み中…</p>
+        )}
+        {agenda !== null && agenda.alerts.length === 0 && (
+          <p style={{ color: 'var(--accent-2)', margin: 0 }}>
+            ✓ 対応が必要な項目はありません
+          </p>
+        )}
+        {agenda !== null && agenda.alerts.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {agenda.alerts.map((alert, i) => (
+              <div
+                key={i}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  background: 'var(--panel-2)',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                <span className={severityBadgeClass(alert.severity)}>
+                  {severityLabel(alert.severity)}
+                </span>
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: 'var(--muted)',
+                    background: 'var(--panel)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 4,
+                    padding: '1px 6px',
+                  }}
+                >
+                  {KIND_LABELS[alert.kind]}
+                </span>
+                <span style={{ flex: 1, fontSize: 14 }}>{alert.title}</span>
+                {alert.dueDate && (
+                  <span style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                    {alert.dueDate}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ── 月セレクタ ── */}
+      <div className="field" style={{ marginTop: 20 }}>
         <span>対象月</span>
         <input
           type="month"
