@@ -27,3 +27,6 @@ _pack_inspect/
 
 # OMC / fullralph 状態は保持(audit trail)。ログのみ無視。
 .omc/logs/
+
+# OMC ランタイム状態(セッション固有・成果物ではない)
+.omc/
