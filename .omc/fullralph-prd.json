@@ -96,11 +96,13 @@
       "priority": 10,
       "engine": "codex",
       "kind": "implement",
-      "implemented": false,
-      "reviewed": false,
-      "passes": false,
+      "implemented": true,
+      "reviewed": true,
+      "passes": true,
       "retryCount": 0,
-      "maxRetries": 3
+      "maxRetries": 3,
+      "lastResultPath": ".omc/state/fullralph-results/US-003.json",
+      "lastFeedback": ""
     },
     {
       "id": "US-004",
@@ -122,11 +124,13 @@
       "priority": 20,
       "engine": "codex",
       "kind": "implement",
-      "implemented": false,
-      "reviewed": false,
-      "passes": false,
+      "implemented": true,
+      "reviewed": true,
+      "passes": true,
       "retryCount": 0,
-      "maxRetries": 3
+      "maxRetries": 3,
+      "lastResultPath": ".omc/state/fullralph-results/US-004.json",
+      "lastFeedback": ""
     },
     {
       "id": "US-005",
@@ -343,5 +347,5 @@
       "maxRetries": 3
     }
   ],
-  "updatedAt": "2026-06-09T12:29:46.651Z"
+  "updatedAt": "2026-06-09T12:38:34.396Z"
 }
