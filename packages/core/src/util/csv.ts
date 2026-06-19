@@ -3,7 +3,30 @@
  * - BOM を除去して読む(出典パックの CSV は UTF-8 BOM 付き)。
  * - 引用符内のカンマ・改行・"" エスケープに対応。
  * - 出力は Excel で文字化けしないよう既定で BOM を付与可能。
+ * - CSV フォーミュラインジェクション対策: 出力時に数式として解釈され得るセルへ
+ *   先頭 `'` を付与し、Excel 等での数式実行を防ぐ。パース時に対称的に1つだけ
+ *   取り除くため、自前エクスポート→インポートの往復は値を完全に保持する(単射)。
+ *   先頭の空白/既存の `'` を挟んだ数式(` =cmd` / `'=x`)も検出・可逆にする。
  */
+
+// 数式メタ文字(先頭の空白・既存 ' を挟んでも検出)。または制御文字 TAB/CR 始まり。
+const FORMULA_META = /^[ \t\r]*'*[=+\-@]/;
+// 出力時にガードされたセル(先頭 ' に続けて、上記の数式パターン or 制御文字)。
+const GUARDED_FORMULA = /^'(?:[ \t\r]*'*[=+\-@]|[\t\r])/;
+
+function needsFormulaGuard(value: string): boolean {
+  if (FORMULA_META.test(value)) return true;
+  const code = value.charCodeAt(0);
+  return code === 9 /* \t */ || code === 13 /* \r */;
+}
+
+function guardFormula(value: string): string {
+  return needsFormulaGuard(value) ? `'${value}` : value;
+}
+
+function unguardFormula(value: string): string {
+  return GUARDED_FORMULA.test(value) ? value.slice(1) : value;
+}
 
 export type CsvRow = Record<string, string>;
 
@@ -58,7 +81,7 @@ export function parseCsvRaw(input: string): string[][] {
       continue;
     }
     if (ch === ',') {
-      row.push(field);
+      row.push(unguardFormula(field));
       field = '';
       i++;
       continue;
@@ -68,7 +91,7 @@ export function parseCsvRaw(input: string): string[][] {
       continue;
     }
     if (ch === '\n') {
-      row.push(field);
+      row.push(unguardFormula(field));
       rows.push(row);
       field = '';
       row = [];
@@ -80,7 +103,7 @@ export function parseCsvRaw(input: string): string[][] {
   }
   // 末尾フィールド/行
   if (field.length > 0 || row.length > 0) {
-    row.push(field);
+    row.push(unguardFormula(field));
     rows.push(row);
   }
   return rows;
@@ -106,10 +129,11 @@ export function serializeCsv(rows: ReadonlyArray<CsvRow>, opts: SerializeOptions
 }
 
 function escapeCell(value: string): string {
-  if (/[",\r\n]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
+  const guarded = guardFormula(value);
+  if (/[",\r\n]/.test(guarded)) {
+    return `"${guarded.replace(/"/g, '""')}"`;
   }
-  return value;
+  return guarded;
 }
 
 function stripBom(text: string): string {
