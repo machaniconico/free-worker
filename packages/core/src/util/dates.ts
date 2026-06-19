@@ -26,8 +26,13 @@ export function addDays(s: IsoDate, days: number): IsoDate {
 
 export function addMonths(s: IsoDate, months: number): IsoDate {
   const d = parseIsoDate(s);
-  const targetMonth = d.getMonth() + months;
-  d.setMonth(targetMonth);
+  const day = d.getDate();
+  // 月末日(例: 1/31)に月を足すと JS Date が翌々月へロールオーバーするため、
+  // 一旦 1 日に寄せてから月を進め、対象月の末日にクランプする。
+  d.setDate(1);
+  d.setMonth(d.getMonth() + months);
+  const lastDayOfTargetMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(day, lastDayOfTargetMonth));
   return toIsoDate(d);
 }
 

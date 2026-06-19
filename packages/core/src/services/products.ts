@@ -487,8 +487,12 @@ function hasText(value: string | null | undefined): boolean {
   return nullableText(value) !== null;
 }
 
+// 税込単価 × 数量などの下流計算で安全整数域を超えないよう、現実的な上限を設ける。
+// 10億円/単価を上限とする(これを超える価格は入力ミスとみなす)。
+const MAX_PRICE_TAX_INCLUDED = 1_000_000_000;
+
 function isValidPrice(value: number): boolean {
-  return Number.isSafeInteger(value) && value >= 0;
+  return Number.isSafeInteger(value) && value >= 0 && value <= MAX_PRICE_TAX_INCLUDED;
 }
 
 function mapProduct(row: ProductRow): Product {

@@ -49,17 +49,20 @@ const ENTITY_TYPE = 'obligation';
 
 export function createObligation(db: DB, input: CreateObligationInput, actor = 'local_user'): Obligation {
   const payload = normalizeCreate(input);
-  const result = db
-    .prepare(
-      `INSERT INTO obligations
+  // INSERT と監査ログ書き込みをアトミックにし、途中失敗で監査欠落/孤立行が生じないようにする。
+  return db.transaction(() => {
+    const result = db
+      .prepare(
+        `INSERT INTO obligations
         (category, title, description, due_date, recurrence, status, source_id, evidence_attachment_id)
        VALUES
         (@category, @title, @description, @dueDate, @recurrence, @status, @sourceId, @evidenceAttachmentId)`,
-    )
-    .run(payload);
-  const created = getObligationOrThrow(db, Number(result.lastInsertRowid));
-  writeAudit(db, { actor, action: 'create', entityType: ENTITY_TYPE, entityId: created.id, after: created });
-  return created;
+      )
+      .run(payload);
+    const created = getObligationOrThrow(db, Number(result.lastInsertRowid));
+    writeAudit(db, { actor, action: 'create', entityType: ENTITY_TYPE, entityId: created.id, after: created });
+    return created;
+  })();
 }
 
 export function getObligation(db: DB, id: number): Obligation | null {

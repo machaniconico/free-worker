@@ -328,10 +328,31 @@ function entriesFromTaxRateSummary(order: Order): TaxCategoryEntry[] {
       const [taxCategory, taxAmount] = entries[0]!;
       return [{ taxCategory, salesTaxIncluded: order.subtotalTaxIncluded, taxAmount }];
     }
-    return entries.map(([taxCategory, taxAmount]) => ({ taxCategory, salesTaxIncluded: 0, taxAmount }));
+    // 複数税率(例: 10%と8%の混在)は、税区分(=税率%)と税額から税込売上を再構成する。
+    // 端数の累積で order 合計とズレないよう、最終区分に残額を割り当てて整合させる。
+    let remaining = order.subtotalTaxIncluded;
+    return entries.map(([taxCategory, taxAmount], index) => {
+      const isLast = index === entries.length - 1;
+      let salesTaxIncluded: number;
+      if (isLast) {
+        salesTaxIncluded = remaining;
+      } else {
+        const ratePercent = parseRatePercent(taxCategory);
+        salesTaxIncluded =
+          ratePercent != null ? Math.round((taxAmount * (100 + ratePercent)) / ratePercent) : 0;
+        remaining -= salesTaxIncluded;
+      }
+      return { taxCategory, salesTaxIncluded, taxAmount };
+    });
   } catch {
     return [];
   }
+}
+
+/** 税区分キー("10"/"8"等)を税率パーセントに変換。数値でなければ null。 */
+function parseRatePercent(taxCategory: string): number | null {
+  const n = Number(taxCategory);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 function sortByChannel<T extends { channel: string }>(rows: T[]): T[] {

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -114,6 +114,33 @@ describe('encrypted local backup service', () => {
     } finally {
       source.close();
     }
+  });
+  it('ヘッダ(sourceDbPath)を改竄したバックアップは復元時に認証失敗する', () => {
+    const dir = makeTempDir();
+    const dbPath = join(dir, 'free-worker.sqlite');
+    const outDir = join(dir, 'backups');
+    const restorePath = join(dir, 'restored.sqlite');
+
+    const db = bootstrap({ filename: dbPath });
+    seedProduct(db);
+    db.close();
+
+    const backup = createBackup(dbPath, 'tamper-proof-passphrase', outDir);
+
+    // ファイル内のヘッダJSON(sourceDbPath)を別パスへ書き換える。
+    // ヘッダ長を変えないよう 'free'(4B) を 'evil'(4B) に同一長で上書きする。
+    const raw = readFileSync(backup.filePath);
+    const idx = raw.indexOf(Buffer.from('free-worker.sqlite'));
+    expect(idx).toBeGreaterThan(0);
+    Buffer.from('evil').copy(raw, idx);
+    writeFileSync(backup.filePath, raw);
+
+    // AAD 認証によりヘッダ改竄は GCM タグ不一致として検知され、復元は失敗する。
+    expect(() => restoreBackup(backup.filePath, 'tamper-proof-passphrase', restorePath)).toThrow();
+    expect(existsSync(restorePath)).toBe(false);
+
+    const failure = runRestoreTest(backup.filePath, 'tamper-proof-passphrase');
+    expect(failure.result).toBe('failure');
   });
 });
 

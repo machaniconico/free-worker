@@ -17,6 +17,23 @@ import {
 } from '../src/services/products.js';
 
 describe('product service', () => {
+  it('価格は非負整数かつ上限内のみ許可する(オーバーフロー防止)', () => {
+    const db = bootstrap({ filename: ':memory:' });
+    const base = { sku: 'PR-LIMIT', title: '上限テスト', productType: 'download' as const };
+
+    // 上限(10億円)ちょうどは許可。
+    expect(createProduct(db, { ...base, sku: 'PR-OK', priceTaxIncluded: 1_000_000_000 }).priceTaxIncluded).toBe(
+      1_000_000_000,
+    );
+    // 上限超過は拒否。
+    expect(() => createProduct(db, { ...base, sku: 'PR-OVER', priceTaxIncluded: 1_000_000_001 })).toThrow(
+      /integer yen/,
+    );
+    // 負値は拒否。
+    expect(() => createProduct(db, { ...base, sku: 'PR-NEG', priceTaxIncluded: -1 })).toThrow(/integer yen/);
+    db.close();
+  });
+
   it('creates, lists, gets, updates, and deletes products with audit logs', () => {
     const db = bootstrap({ filename: ':memory:' });
 

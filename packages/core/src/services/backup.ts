@@ -58,6 +58,7 @@ interface BackupHeader {
 
 interface ParsedBackupFile {
   header: BackupHeader;
+  headerBytes: Buffer;
   ciphertext: Buffer;
   authTag: Buffer;
 }
@@ -122,9 +123,6 @@ export function createBackup(
   const salt = randomBytes(SALT_BYTES);
   const iv = randomBytes(IV_BYTES);
   const key = deriveKey(passphrase, salt);
-  const cipher = createCipheriv('aes-256-gcm', key, iv);
-  const ciphertext = Buffer.concat([cipher.update(plainDb), cipher.final()]);
-  const authTag = cipher.getAuthTag();
 
   const backupPath = join(backupDir, `${backupBaseName()}-${randomBytes(4).toString('hex')}.sqlite.fwbak`);
   const header: BackupHeader = {
@@ -136,7 +134,15 @@ export function createBackup(
     sourceDbPath,
     createdAt: new Date().toISOString(),
   };
-  writeBackupFile(backupPath, header, ciphertext, authTag);
+  // ヘッダ(salt/iv/sourceDbPath 等)を AAD として GCM 認証タグの対象に含める。
+  // これによりヘッダ改竄は復号時に検知され失敗する。書き出すバイト列と完全一致させる。
+  const headerJson = Buffer.from(JSON.stringify(header), 'utf8');
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  cipher.setAAD(headerJson);
+  const ciphertext = Buffer.concat([cipher.update(plainDb), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+
+  writeBackupFile(backupPath, headerJson, ciphertext, authTag);
 
   const sizeBytes = statSync(backupPath).size;
   const sha256 = sha256File(backupPath);
@@ -245,8 +251,7 @@ function checkpointDatabase(dbPath: string): void {
   }
 }
 
-function writeBackupFile(path: string, header: BackupHeader, ciphertext: Buffer, authTag: Buffer): void {
-  const headerJson = Buffer.from(JSON.stringify(header), 'utf8');
+function writeBackupFile(path: string, headerJson: Buffer, ciphertext: Buffer, authTag: Buffer): void {
   const headerLength = Buffer.alloc(HEADER_LENGTH_BYTES);
   headerLength.writeUInt32BE(headerJson.length, 0);
   const fd = openSync(path, 'wx', 0o600);
@@ -277,10 +282,12 @@ function parseBackupFile(path: string): ParsedBackupFile {
   if (headerLength <= 0 || headerEnd > authTagStart) {
     throw new Error('invalid backup file');
   }
-  const header = JSON.parse(contents.subarray(headerStart, headerEnd).toString('utf8')) as BackupHeader;
+  const headerBytes = contents.subarray(headerStart, headerEnd);
+  const header = JSON.parse(headerBytes.toString('utf8')) as BackupHeader;
   validateHeader(header);
   return {
     header,
+    headerBytes,
     ciphertext: contents.subarray(headerEnd, authTagStart),
     authTag: contents.subarray(authTagStart),
   };
@@ -289,6 +296,8 @@ function parseBackupFile(path: string): ParsedBackupFile {
 function decryptBackup(parsed: ParsedBackupFile, passphrase: string): Buffer {
   const key = deriveKey(passphrase, Buffer.from(parsed.header.salt, 'base64'));
   const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(parsed.header.iv, 'base64'));
+  // 暗号化時と同じヘッダバイト列を AAD に設定。改竄されていれば final() で認証失敗する。
+  decipher.setAAD(parsed.headerBytes);
   decipher.setAuthTag(parsed.authTag);
   return Buffer.concat([decipher.update(parsed.ciphertext), decipher.final()]);
 }

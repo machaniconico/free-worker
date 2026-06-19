@@ -86,6 +86,36 @@ describe('tax report service', () => {
     db.close();
   });
 
+  it('単一注文に複数税率(10%+8%)が混在しても税区分ごとの売上高を再構成する', () => {
+    const db = bootstrap({ filename: ':memory:' });
+    createOrder(db, {
+      orderNo: 'TAX-MIX-001',
+      orderedAt: '2026-03-10',
+      channel: 'direct',
+      subtotalTaxIncluded: 16_400,
+      taxAmount: 1_400,
+      invoice: {
+        invoiceNo: 'TAX-MIX-INV-001',
+        issuedAt: '2026-03-11',
+        qualifiedInvoiceFlag: true,
+        taxRateSummary: '{"10":1000,"8":400}',
+      },
+    });
+
+    const report = annualReport(db, 2026);
+    const month = report.months[0];
+
+    // 税区分別の売上高が 0 でなく、合計は注文の税込総額に一致する。
+    expect(month?.salesByTaxCategory).toEqual([
+      { taxCategory: '10', salesTaxIncluded: 11_000, taxAmount: 1_000, orderCount: 1 },
+      { taxCategory: '8', salesTaxIncluded: 5_400, taxAmount: 400, orderCount: 1 },
+    ]);
+    const sumByCategory = (month?.salesByTaxCategory ?? []).reduce((s, e) => s + e.salesTaxIncluded, 0);
+    expect(sumByCategory).toBe(16_400);
+    expect(month?.salesTaxIncluded).toBe(16_400);
+    db.close();
+  });
+
   it('year未指定や該当データ無しでも空集計を返す', () => {
     const db = bootstrap({ filename: ':memory:' });
     expect(annualReport(db).months).toEqual([]);
