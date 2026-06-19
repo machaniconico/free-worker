@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, addMonths, diffDays, dueStatus, nextOccurrence } from '../src/util/dates.js';
+import { addDays, addMonths, diffDays, dueStatus, nextOccurrence, parseIsoDate } from '../src/util/dates.js';
 
 describe('dates utility', () => {
   describe('addMonths', () => {
@@ -59,6 +59,25 @@ describe('dates utility', () => {
       expect(dueStatus('2026-06-19', today)).toBe('due_soon'); // 当日
       expect(dueStatus('2026-07-03', today)).toBe('due_soon'); // ちょうど14日後
       expect(dueStatus('2026-07-04', today)).toBe('upcoming'); // 15日後
+    });
+  });
+
+  describe('parseIsoDate の検証', () => {
+    it('形式不正を弾く', () => {
+      expect(() => parseIsoDate('2026/06/19')).toThrow();
+      expect(() => parseIsoDate('not-a-date')).toThrow();
+    });
+
+    it('意味的に不正な日付(月13/2月30日など)を弾く', () => {
+      expect(() => parseIsoDate('2026-13-01')).toThrow(/不正な日付/);
+      expect(() => parseIsoDate('2026-02-30')).toThrow(/不正な日付/);
+      expect(() => parseIsoDate('2026-00-10')).toThrow(/不正な日付/);
+      expect(() => parseIsoDate('2026-04-31')).toThrow(/不正な日付/);
+    });
+
+    it('正当な日付(うるう年2/29含む)は通す', () => {
+      expect(() => parseIsoDate('2024-02-29')).not.toThrow();
+      expect(() => parseIsoDate('2026-12-31')).not.toThrow();
     });
   });
 

@@ -15,7 +15,16 @@ export function toIsoDate(d: Date): IsoDate {
 export function parseIsoDate(s: IsoDate): Date {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
   if (!m) throw new Error(`不正な日付形式: ${s}`);
-  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  const d = new Date(year, month - 1, day);
+  // JS Date は 2026-02-30 や 2026-13-01 を黙ってロールオーバーさせるため、
+  // 構築後に各要素が一致するか検証して意味的に不正な日付を弾く。
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) {
+    throw new Error(`不正な日付: ${s}`);
+  }
+  return d;
 }
 
 export function addDays(s: IsoDate, days: number): IsoDate {
