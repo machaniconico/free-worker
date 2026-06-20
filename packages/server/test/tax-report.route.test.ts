@@ -96,6 +96,41 @@ describe('taxReportRoutes', () => {
     expect(res.statusCode).toBe(400);
     expect(res.json()).toEqual({ error: 'invalid_year' });
   });
+
+  it('複数税率注文の salesByChannelAndTaxCategory / salesByTaxCategory [characterization: ADR-C1]', async () => {
+    // 委譲前 (Step 1): 現状 route は複数税率時に salesTaxIncluded: 0 を返すバグがある。
+    // このテストは現状バグ出力を pin し、委譲後に core 値へ書き換える (Step 3)。
+    seedOrder(db, {
+      orderNo: 'ROUTE-TAX-MULTI-001',
+      orderedAt: '2026-05-15',
+      channel: 'direct',
+      subtotalTaxIncluded: 21_800,
+      taxAmount: 1_800,
+      taxRateSummary: '{"10":1000,"8":800}',
+    });
+
+    const res = await app.inject({ method: 'GET', url: '/api/tax-report?year=2026' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+
+    // 月レベル salesTaxIncluded は両実装とも 21800（変化しない）
+    expect(body.months[0].salesTaxIncluded).toBe(21_800);
+    // totals も同様
+    expect(body.totals.salesTaxIncluded).toBe(21_800);
+
+    // ADR-C1: 複数税率の salesTaxIncluded は core で再構成される（旧 route は全ゼロを返すバグだった）。
+    // taxCategory は localeCompare 昇順: "10" → "8"
+    // "10": round(1000 * 110 / 10) = 11000
+    // "8":  remaining = 21800 - 11000 = 10800
+    expect(body.months[0].salesByChannelAndTaxCategory).toEqual([
+      { channel: 'direct', taxCategory: '10', salesTaxIncluded: 11_000, taxAmount: 1000, orderCount: 1 },
+      { channel: 'direct', taxCategory: '8',  salesTaxIncluded: 10_800, taxAmount: 800,  orderCount: 1 },
+    ]);
+    expect(body.months[0].salesByTaxCategory).toEqual([
+      { taxCategory: '10', salesTaxIncluded: 11_000, taxAmount: 1000, orderCount: 1 },
+      { taxCategory: '8',  salesTaxIncluded: 10_800, taxAmount: 800,  orderCount: 1 },
+    ]);
+  });
 });
 
 function seedOrder(
