@@ -58,6 +58,7 @@ describe('tax report service', () => {
     expect(report.totals).toEqual({
       salesTaxIncluded: 16_400,
       taxAmount: 1_400,
+      withholdingTax: 0,
       expenseTaxIncluded: 5_500,
       grossProfit: 10_900,
     });
@@ -127,6 +128,41 @@ describe('tax report service', () => {
       grossProfit: 0,
       months: [],
     });
+    db.close();
+  });
+
+  it('源泉徴収税付き注文の withholdingTax が月・年次集計に反映される', () => {
+    const db = bootstrap({ filename: ':memory:' });
+    createOrder(db, {
+      orderNo: 'WH-001',
+      orderedAt: '2026-05-10',
+      channel: 'direct',
+      subtotalTaxIncluded: 100_000,
+      taxAmount: 9_090,
+      withholdingTax: 10_210,
+    });
+    createOrder(db, {
+      orderNo: 'WH-002',
+      orderedAt: '2026-05-20',
+      channel: 'direct',
+      subtotalTaxIncluded: 50_000,
+      taxAmount: 4_545,
+      withholdingTax: 5_105,
+    });
+    // withholdingTax なし
+    createOrder(db, {
+      orderNo: 'WH-003',
+      orderedAt: '2026-05-25',
+      channel: 'store',
+      subtotalTaxIncluded: 20_000,
+      taxAmount: 1_818,
+    });
+
+    const report = annualReport(db, 2026);
+
+    expect(report.withholdingTotal).toBe(15_315);
+    expect(report.totals.withholdingTax).toBe(15_315);
+    expect(report.months[0]?.withholdingTax).toBe(15_315);
     db.close();
   });
 

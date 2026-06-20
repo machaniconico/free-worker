@@ -154,6 +154,36 @@ describe('salesRoutes', () => {
     expect(list.json()).toHaveLength(3);
   });
 
+  it('withholdingTax を含む注文の作成→取得で値が保持される', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/sales',
+      payload: {
+        orderNo: 'WH-ROUTE-001',
+        orderedAt: '2026-06-20',
+        channel: 'direct',
+        subtotalTaxIncluded: 100_000,
+        taxAmount: 9_090,
+        withholdingTax: 10_210,
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.json().withholdingTax).toBe(10_210);
+
+    const fetched = await app.inject({ method: 'GET', url: `/api/sales/${created.json().id}` });
+    expect(fetched.statusCode).toBe(200);
+    expect(fetched.json().withholdingTax).toBe(10_210);
+
+    // UPDATE で withholdingTax を変更できる
+    const updated = await app.inject({
+      method: 'PUT',
+      url: `/api/sales/${created.json().id}`,
+      payload: { withholdingTax: 5_105 },
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json().withholdingTax).toBe(5_105);
+  });
+
   it('不正な作成ペイロードは400', async () => {
     const res = await app.inject({ method: 'POST', url: '/api/sales', payload: { channel: 'direct' } });
     expect(res.statusCode).toBe(400);

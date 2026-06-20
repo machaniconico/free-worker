@@ -97,6 +97,32 @@ describe('taxReportRoutes', () => {
     expect(res.json()).toEqual({ error: 'invalid_year' });
   });
 
+  it('GET /api/tax-report/withholding?base=100000 → withholdingTax:10210', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/tax-report/withholding?base=100000' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ base: 100_000, withholdingTax: 10_210 });
+  });
+
+  it('GET /api/tax-report/withholding?base=1500000 → withholdingTax:204200', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/tax-report/withholding?base=1500000' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ base: 1_500_000, withholdingTax: 204_200 });
+  });
+
+  it('GET /api/tax-report/withholding 不正なbaseは400', async () => {
+    const negRes = await app.inject({ method: 'GET', url: '/api/tax-report/withholding?base=-1' });
+    expect(negRes.statusCode).toBe(400);
+    expect(negRes.json()).toEqual({ error: 'invalid_base' });
+
+    const strRes = await app.inject({ method: 'GET', url: '/api/tax-report/withholding?base=abc' });
+    expect(strRes.statusCode).toBe(400);
+    expect(strRes.json()).toEqual({ error: 'invalid_base' });
+
+    const missingRes = await app.inject({ method: 'GET', url: '/api/tax-report/withholding' });
+    expect(missingRes.statusCode).toBe(400);
+    expect(missingRes.json()).toEqual({ error: 'invalid_base' });
+  });
+
   it('複数税率注文の salesByChannelAndTaxCategory / salesByTaxCategory [characterization: ADR-C1]', async () => {
     // 委譲前 (Step 1): 現状 route は複数税率時に salesTaxIncluded: 0 を返すバグがある。
     // このテストは現状バグ出力を pin し、委譲後に core 値へ書き換える (Step 3)。

@@ -1,8 +1,12 @@
 import type { FastifyInstance } from 'fastify';
-import { annualReport, exportAnnualReportCsv } from '@free-worker/core';
+import { annualReport, computeWithholdingTax, exportAnnualReportCsv } from '@free-worker/core';
 
 interface TaxReportQuery {
   year?: string;
+}
+
+interface WithholdingQuery {
+  base?: string;
 }
 
 export async function taxReportRoutes(app: FastifyInstance): Promise<void> {
@@ -23,6 +27,16 @@ export async function taxReportRoutes(app: FastifyInstance): Promise<void> {
     }
     reply.header('content-type', 'text/csv; charset=utf-8');
     return exportAnnualReportCsv(app.db, year);
+  });
+
+  app.get<{ Querystring: WithholdingQuery }>('/api/tax-report/withholding', async (req, reply) => {
+    const rawBase = req.query.base;
+    if (rawBase === undefined || !/^\d+$/.test(rawBase)) {
+      reply.code(400);
+      return { error: 'invalid_base' };
+    }
+    const base = Number(rawBase);
+    return { base, withholdingTax: computeWithholdingTax(base) };
   });
 }
 

@@ -5,6 +5,7 @@ import {
   inclusiveFromExclusive,
   sumTaxIncluded,
   formatYen,
+  computeWithholdingTax,
   TAX_RATE_REDUCED,
 } from '../src/util/money.js';
 
@@ -51,5 +52,37 @@ describe('money', () => {
   it('円表記', () => {
     expect(formatYen(1280)).toBe('¥1,280');
     expect(formatYen(-500)).toBe('-¥500');
+  });
+});
+
+describe('computeWithholdingTax', () => {
+  it('0円 → 0', () => {
+    expect(computeWithholdingTax(0)).toBe(0);
+  });
+
+  it('10,000円 → 1,021円 (10.21% 切り捨て)', () => {
+    expect(computeWithholdingTax(10_000)).toBe(1_021);
+  });
+
+  it('100,000円 → 10,210円', () => {
+    expect(computeWithholdingTax(100_000)).toBe(10_210);
+  });
+
+  it('1,000,000円 → 102,100円 (境界)', () => {
+    expect(computeWithholdingTax(1_000_000)).toBe(102_100);
+  });
+
+  it('1,500,000円 → 204,200円 (超過分 20.42%)', () => {
+    // 超過分: (1,500,000 - 1,000,000) * 0.2042 = 102,100 → floor = 102,100
+    // 合計: 102,100 + 102,100 = 204,200
+    expect(computeWithholdingTax(1_500_000)).toBe(204_200);
+  });
+
+  it('負値は拒否', () => {
+    expect(() => computeWithholdingTax(-1)).toThrow();
+  });
+
+  it('非整数は拒否', () => {
+    expect(() => computeWithholdingTax(100.5)).toThrow();
   });
 });

@@ -7,6 +7,7 @@ import { listOrders, type Order } from './sales.js';
 export interface AnnualReportTotals {
   salesTaxIncluded: number;
   taxAmount: number;
+  withholdingTax: number;
   expenseTaxIncluded: number;
   grossProfit: number;
 }
@@ -52,6 +53,7 @@ export interface AnnualReport {
   year: number | null;
   salesTotal: number;
   taxAmountTotal: number;
+  withholdingTotal: number;
   expenseTotal: number;
   grossProfit: number;
   totals: AnnualReportTotals;
@@ -84,6 +86,7 @@ export function annualReport(db: DB, year?: number | string | null): AnnualRepor
     const taxEntries = taxCategoryEntries(order);
     current.salesTaxIncluded += order.subtotalTaxIncluded;
     current.taxAmount += order.taxAmount ?? 0;
+    current.withholdingTax += order.withholdingTax ?? 0;
 
     addChannel(current, order.channel, order.subtotalTaxIncluded, order.taxAmount ?? 0);
     for (const entry of taxEntries) {
@@ -107,17 +110,19 @@ export function annualReport(db: DB, year?: number | string | null): AnnualRepor
     (acc, month) => {
       acc.salesTaxIncluded += month.salesTaxIncluded;
       acc.taxAmount += month.taxAmount;
+      acc.withholdingTax += month.withholdingTax;
       acc.expenseTaxIncluded += month.expenseTaxIncluded;
       acc.grossProfit += month.grossProfit;
       return acc;
     },
-    { salesTaxIncluded: 0, taxAmount: 0, expenseTaxIncluded: 0, grossProfit: 0 } satisfies AnnualReportTotals,
+    { salesTaxIncluded: 0, taxAmount: 0, withholdingTax: 0, expenseTaxIncluded: 0, grossProfit: 0 } satisfies AnnualReportTotals,
   );
 
   return {
     year: normalizedYear,
     salesTotal: totals.salesTaxIncluded,
     taxAmountTotal: totals.taxAmount,
+    withholdingTotal: totals.withholdingTax,
     expenseTotal: totals.expenseTaxIncluded,
     grossProfit: totals.grossProfit,
     totals,
@@ -185,11 +190,12 @@ interface TaxCategoryEntry {
 }
 
 function emptyReport(year: number | null): AnnualReport {
-  const totals = { salesTaxIncluded: 0, taxAmount: 0, expenseTaxIncluded: 0, grossProfit: 0 };
+  const totals = { salesTaxIncluded: 0, taxAmount: 0, withholdingTax: 0, expenseTaxIncluded: 0, grossProfit: 0 };
   return {
     year,
     salesTotal: 0,
     taxAmountTotal: 0,
+    withholdingTotal: 0,
     expenseTotal: 0,
     grossProfit: 0,
     totals,
@@ -210,6 +216,7 @@ function getMonth(months: Map<string, MutableAnnualReportMonth>, month: string):
     month,
     salesTaxIncluded: 0,
     taxAmount: 0,
+    withholdingTax: 0,
     expenseTaxIncluded: 0,
     grossProfit: 0,
     channels: new Map(),
@@ -292,6 +299,7 @@ function finalizeMonth(month: MutableAnnualReportMonth): AnnualReportMonth {
     month: month.month,
     salesTaxIncluded: month.salesTaxIncluded,
     taxAmount: month.taxAmount,
+    withholdingTax: month.withholdingTax,
     expenseTaxIncluded: month.expenseTaxIncluded,
     grossProfit,
     salesByChannel: sortByChannel([...month.channels.values()]),

@@ -66,8 +66,26 @@ export function formatYen(amount: number): string {
   return `${sign}¥${abs.toLocaleString('ja-JP')}`;
 }
 
+/**
+ * 報酬・料金の源泉徴収税額を計算する(給与ではなく事業者報酬の標準税率)。
+ * 国税庁ルール: 100万円以下 10.21%、超過分 20.42%。端数は切り捨て。
+ */
+export function computeWithholdingTax(base: number): number {
+  assertNonNegativeIntYen(base);
+  if (base <= 1_000_000) {
+    return Math.floor(base * 0.1021);
+  }
+  return Math.floor((base - 1_000_000) * 0.2042) + 102_100;
+}
+
 function assertIntYen(n: number): void {
   if (!Number.isSafeInteger(n)) {
     throw new Error(`金額は整数(円)で扱ってください: ${n}`);
+  }
+}
+
+function assertNonNegativeIntYen(n: number): void {
+  if (!Number.isSafeInteger(n) || n < 0) {
+    throw new Error(`金額は非負整数(円)で扱ってください: ${n}`);
   }
 }
