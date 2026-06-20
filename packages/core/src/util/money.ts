@@ -67,7 +67,7 @@ export function formatYen(amount: number): string {
 }
 
 function assertIntYen(n: number): void {
-  if (!Number.isInteger(n)) {
+  if (!Number.isSafeInteger(n)) {
     throw new Error(`金額は整数(円)で扱ってください: ${n}`);
   }
 }

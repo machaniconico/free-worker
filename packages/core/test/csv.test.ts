@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { parseCsv, serializeCsv } from '../src/util/csv.js';
 
+// テスト用に内部関数へアクセスする型安全でない回避策を避け、
+// serializeCsv/parseCsv 経由で round-trip を検証する。
+function roundTrip(value: string): string {
+  const rows = parseCsv(serializeCsv([{ v: value }], { bom: false }));
+  return rows[0]?.v ?? '';
+}
+
 describe('csv', () => {
   it('BOM除去 + ヘッダ付きパース', () => {
     const text = '﻿id,name\n1,太郎\n2,花子\n';
@@ -78,5 +85,39 @@ describe('csv', () => {
       // 往復で完全一致。
       expect(parseCsv(csv)).toEqual(rows);
     });
+  });
+
+  describe('unguardFormula round-trip: guard対象は可逆、未ガードデータは破壊されない', () => {
+    // guard 対象: serializeCsv→parseCsv で元の値に戻る
+    const guardTargets = [
+      '=SUM(A1)',
+      '+1',
+      '-1',
+      '@x',
+      "'=x",   // 先頭クォート+式
+      '\t=x',  // タブ+式
+      '  =x',  // 空白+式
+      "''=x",  // 多重クォート+式
+    ];
+    for (const v of guardTargets) {
+      it(`guard対象が可逆: ${JSON.stringify(v)}`, () => {
+        expect(roundTrip(v)).toBe(v);
+      });
+    }
+
+    // 未ガードデータ: serializeCsv→parseCsv で不変(データ破壊しない)
+    const unguardedData = [
+      "'\thello",  // クォート+タブ+非式 → 旧実装で破壊されていたケース
+      "'\rfoo",    // クォート+CR+非式
+      "'hello",    // クォート+文字(非式)
+      'hello',     // 普通の文字列
+      '',          // 空文字
+      "'",         // 単独クォート
+    ];
+    for (const v of unguardedData) {
+      it(`未ガードデータが破壊されない: ${JSON.stringify(v)}`, () => {
+        expect(roundTrip(v)).toBe(v);
+      });
+    }
   });
 });
