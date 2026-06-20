@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { writeAudit } from '../audit.js';
 import type { DB } from '../db/connection.js';
 import { parseIsoDate } from '../util/dates.js';
@@ -56,6 +57,19 @@ function mapProfile(row: ProfileRow): BusinessProfile {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+/**
+ * 監査ログ用スナップショット: invoiceRegistrationNumber を SHA-256 ハッシュに置換する。
+ * business_profiles テーブルの保存値は平文のまま変えない。
+ */
+function sanitizeProfileForAudit(profile: BusinessProfile): Omit<BusinessProfile, 'invoiceRegistrationNumber'> & { invoiceRegistrationNumber: string | null } {
+  const { invoiceRegistrationNumber, ...rest } = profile;
+  const hashed =
+    invoiceRegistrationNumber != null
+      ? createHash('sha256').update(invoiceRegistrationNumber).digest('hex')
+      : null;
+  return { ...rest, invoiceRegistrationNumber: hashed };
 }
 
 function normalizeRequiredText(value: string, field: string): string {
@@ -133,7 +147,7 @@ export function createProfile(db: DB, input: CreateProfileInput): BusinessProfil
       action: 'create',
       entityType: 'business_profile',
       entityId: profile.id,
-      after: profile,
+      after: sanitizeProfileForAudit(profile),
     });
     return profile;
   });
@@ -197,8 +211,8 @@ export function updateProfile(db: DB, id: number, input: UpdateProfileInput): Bu
       action: 'update',
       entityType: 'business_profile',
       entityId: id,
-      before,
-      after,
+      before: sanitizeProfileForAudit(before),
+      after: sanitizeProfileForAudit(after),
     });
     return after;
   });
@@ -215,7 +229,7 @@ export function deleteProfile(db: DB, id: number): boolean {
       action: 'delete',
       entityType: 'business_profile',
       entityId: id,
-      before,
+      before: sanitizeProfileForAudit(before),
     });
     db.prepare('DELETE FROM business_profiles WHERE id = ?').run(id);
   });

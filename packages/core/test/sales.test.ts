@@ -74,6 +74,38 @@ describe('sales service', () => {
     db.close();
   });
 
+  it('CSV取込(importOrdersCsv)で create/update それぞれ監査ログを記録する(#8)', () => {
+    const db = bootstrap({ filename: ':memory:' });
+    const productId = seedProduct(db);
+
+    // 1回目: 新規作成
+    const csv1 =
+      'orderNo,customerId,orderedAt,channel,subtotalTaxIncluded,taxAmount,paymentStatus,deliveryStatus,refundStatus,itemsJson,invoiceNo,invoiceIssuedAt,buyerName,qualifiedInvoiceFlag,taxRateSummary,attachmentId\n' +
+      `ORD-CSV-AUDIT-1,,2026-06-01,direct,5500,500,pending,not_delivered,none,,,,,,,,`;
+    importOrdersCsv(db, csv1);
+
+    const afterCreate = db
+      .prepare("SELECT action, after_json FROM audit_logs WHERE entity_type = 'order' ORDER BY id DESC LIMIT 1")
+      .get() as { action: string; after_json: string };
+    expect(afterCreate.action).toBe('create');
+    expect(JSON.parse(afterCreate.after_json)).toMatchObject({ orderNo: 'ORD-CSV-AUDIT-1' });
+
+    // 2回目: 同じ orderNo → update
+    const csv2 =
+      'orderNo,customerId,orderedAt,channel,subtotalTaxIncluded,taxAmount,paymentStatus,deliveryStatus,refundStatus,itemsJson,invoiceNo,invoiceIssuedAt,buyerName,qualifiedInvoiceFlag,taxRateSummary,attachmentId\n' +
+      `ORD-CSV-AUDIT-1,,2026-06-01,direct,6600,600,paid,not_delivered,none,,,,,,,,`;
+    importOrdersCsv(db, csv2);
+
+    const allOrderAudits = db
+      .prepare("SELECT action FROM audit_logs WHERE entity_type = 'order' ORDER BY id ASC")
+      .all() as Array<{ action: string }>;
+    // create 1件 + update 1件
+    expect(allOrderAudits.map((r) => r.action)).toContain('create');
+    expect(allOrderAudits.map((r) => r.action)).toContain('update');
+
+    db.close();
+  });
+
   it('CSV export/import の往復で注文・明細・請求書データを保持する', () => {
     const sourceDb = bootstrap({ filename: ':memory:' });
     const sourceProductId = seedProduct(sourceDb);
