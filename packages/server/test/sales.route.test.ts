@@ -133,6 +133,7 @@ describe('salesRoutes', () => {
         taxAmount: 2_500,
         uncollectedAmount: 5_500,
         refundAmount: 5_500,
+        cancelledAmount: 0,
         orderCount: 2,
       },
     ]);

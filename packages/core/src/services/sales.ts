@@ -93,6 +93,7 @@ export interface MonthlySalesSummary {
   taxAmount: number;
   uncollectedAmount: number;
   refundAmount: number;
+  cancelledAmount: number;
   orderCount: number;
 }
 
@@ -293,12 +294,14 @@ export function monthlySummary(db: DB, month?: string): MonthlySalesSummary[] {
         taxAmount: 0,
         uncollectedAmount: 0,
         refundAmount: 0,
+        cancelledAmount: 0,
         orderCount: 0,
       } satisfies MonthlySalesSummary);
     current.salesTaxIncluded += order.subtotalTaxIncluded;
     current.taxAmount += order.taxAmount ?? 0;
     if (order.paymentStatus !== 'paid') current.uncollectedAmount += order.subtotalTaxIncluded;
     if (order.refundStatus !== 'none') current.refundAmount += order.subtotalTaxIncluded;
+    if (order.paymentStatus === 'cancelled') current.cancelledAmount += order.subtotalTaxIncluded;
     current.orderCount += 1;
     summaries.set(key, current);
   }
