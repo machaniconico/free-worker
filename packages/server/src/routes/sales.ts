@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import {
   createOrder,
   updateOrder,
@@ -14,6 +14,7 @@ import {
   type Order,
   type CreateOrderInput,
   type UpdateOrderInput,
+  type DB,
 } from '@free-worker/core';
 
 interface IdParams {
@@ -28,6 +29,39 @@ function parseId(id: string): number | null {
   if (!/^\d+$/.test(id)) return null;
   const parsed = Number(id);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+async function patchStatus(
+  app: FastifyInstance,
+  idText: string,
+  statusValue: unknown,
+  fn: (db: DB, id: number, status: string) => Order | null,
+  reply: FastifyReply,
+): Promise<Order | { error: string; message?: string }> {
+  const id = parseId(idText);
+  if (id == null) {
+    reply.code(400);
+    return { error: 'invalid_id' };
+  }
+  if (!getOrder(app.db, id)) {
+    reply.code(404);
+    return { error: 'not_found' };
+  }
+  if (typeof statusValue !== 'string') {
+    reply.code(400);
+    return { error: 'invalid_payload', message: 'status must be a string' };
+  }
+  try {
+    const result = fn(app.db, id, statusValue);
+    if (result == null) {
+      reply.code(404);
+      return { error: 'not_found' };
+    }
+    return result;
+  } catch (error) {
+    reply.code(400);
+    return { error: 'invalid_payload', message: error instanceof Error ? error.message : 'invalid payload' };
+  }
 }
 
 export async function salesRoutes(app: FastifyInstance): Promise<void> {
@@ -104,72 +138,15 @@ export async function salesRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.patch<{ Body: { status?: unknown }; Params: IdParams }>('/api/sales/:id/payment', async (req, reply) => {
-    const id = parseId(req.params.id);
-    if (id == null) {
-      reply.code(400);
-      return { error: 'invalid_id' };
-    }
-    if (!getOrder(app.db, id)) {
-      reply.code(404);
-      return { error: 'not_found' };
-    }
-    try {
-      const result: Order | null = updatePaymentStatus(app.db, id, String(req.body?.status ?? ''));
-      if (result == null) {
-        reply.code(404);
-        return { error: 'not_found' };
-      }
-      return result;
-    } catch (error) {
-      reply.code(400);
-      return { error: 'invalid_payload', message: error instanceof Error ? error.message : 'invalid payload' };
-    }
+    return patchStatus(app, req.params.id, req.body?.status, updatePaymentStatus, reply);
   });
 
   app.patch<{ Body: { status?: unknown }; Params: IdParams }>('/api/sales/:id/refund', async (req, reply) => {
-    const id = parseId(req.params.id);
-    if (id == null) {
-      reply.code(400);
-      return { error: 'invalid_id' };
-    }
-    if (!getOrder(app.db, id)) {
-      reply.code(404);
-      return { error: 'not_found' };
-    }
-    try {
-      const result: Order | null = updateRefundStatus(app.db, id, String(req.body?.status ?? ''));
-      if (result == null) {
-        reply.code(404);
-        return { error: 'not_found' };
-      }
-      return result;
-    } catch (error) {
-      reply.code(400);
-      return { error: 'invalid_payload', message: error instanceof Error ? error.message : 'invalid payload' };
-    }
+    return patchStatus(app, req.params.id, req.body?.status, updateRefundStatus, reply);
   });
 
   app.patch<{ Body: { status?: unknown }; Params: IdParams }>('/api/sales/:id/delivery', async (req, reply) => {
-    const id = parseId(req.params.id);
-    if (id == null) {
-      reply.code(400);
-      return { error: 'invalid_id' };
-    }
-    if (!getOrder(app.db, id)) {
-      reply.code(404);
-      return { error: 'not_found' };
-    }
-    try {
-      const result: Order | null = updateDeliveryStatus(app.db, id, String(req.body?.status ?? ''));
-      if (result == null) {
-        reply.code(404);
-        return { error: 'not_found' };
-      }
-      return result;
-    } catch (error) {
-      reply.code(400);
-      return { error: 'invalid_payload', message: error instanceof Error ? error.message : 'invalid payload' };
-    }
+    return patchStatus(app, req.params.id, req.body?.status, updateDeliveryStatus, reply);
   });
 
   app.delete<{ Params: IdParams }>('/api/sales/:id', async (req, reply) => {

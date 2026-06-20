@@ -206,6 +206,32 @@ describe('salesRoutes', () => {
     const deleteCount = afterDelete.filter((r) => r.action === 'delete').length;
     expect(deleteCount).toBe(1);
   });
+
+  it('PATCH ステータス更新: 非文字列 status は 400 invalid_payload を返す', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/sales',
+      payload: {
+        orderNo: 'PATCH-TYPE-001',
+        orderedAt: '2026-06-20',
+        channel: 'direct',
+        subtotalTaxIncluded: 10_000,
+        taxAmount: 909,
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    const orderId: number = created.json().id;
+
+    // 数値 status → 400（旧挙動と同じ）
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/sales/${orderId}/payment`,
+      payload: { status: 123 },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe('invalid_payload');
+    expect(res.json().message).toBe('status must be a string');
+  });
 });
 
 function seedProduct(db: DB, id: number): void {
