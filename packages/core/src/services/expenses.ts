@@ -2,6 +2,7 @@ import { writeAudit } from '../audit.js';
 import type { DB } from '../db/connection.js';
 import { parseCsv, serializeCsv, type CsvRow } from '../util/csv.js';
 import { yearMonth } from '../util/dates.js';
+import { cellToInteger, cellToNullableInteger, nullableText, requireText } from '../util/validate.js';
 
 export interface Expense {
   id: number;
@@ -273,18 +274,6 @@ function expenseInputFromCsv(row: CsvRow): CreateExpenseInput {
   };
 }
 
-function requireText(value: string | null | undefined, field: string): string {
-  const text = nullableText(value);
-  if (!text) throw new Error(`${field} is required`);
-  return text;
-}
-
-function nullableText(value: string | null | undefined): string | null {
-  if (value == null) return null;
-  const text = value.trim();
-  return text.length > 0 ? text : null;
-}
-
 function requireInteger(value: number | null | undefined, field: string): number {
   if (!Number.isInteger(value)) throw new Error(`${field} must be an integer`);
   return Number(value);
@@ -293,18 +282,6 @@ function requireInteger(value: number | null | undefined, field: string): number
 function nullableInteger(value: number | null | undefined, field: string): number | null {
   if (value == null) return null;
   return requireInteger(value, field);
-}
-
-function cellToInteger(value: string | undefined, field: string): number {
-  const text = requireText(value, field);
-  const parsed = Number(text);
-  if (!Number.isInteger(parsed)) throw new Error(`${field} must be an integer`);
-  return parsed;
-}
-
-function cellToNullableInteger(value: string | undefined, field: string): number | null {
-  if (!value?.trim()) return null;
-  return cellToInteger(value, field);
 }
 
 function numberToCell(value: number | null): string {

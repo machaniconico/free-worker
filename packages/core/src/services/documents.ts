@@ -1,5 +1,6 @@
 import { writeAudit } from '../audit.js';
 import type { DB } from '../db/connection.js';
+import { nullableText, requireText } from '../util/validate.js';
 
 export type DocumentType = 'tokushoho' | 'terms' | 'privacy' | 'contract_template' | 'license' | 'other';
 export type DocumentState = 'draft' | 'published' | 'archived';
@@ -247,14 +248,3 @@ function assertDocumentType(value: DocumentType): void {
   parseDocumentType(value);
 }
 
-function requireText(value: string | null | undefined, field: string): string {
-  const text = nullableText(value);
-  if (!text) throw new Error(`${field} is required`);
-  return text;
-}
-
-function nullableText(value: string | null | undefined): string | null {
-  if (value == null) return null;
-  const text = value.trim();
-  return text.length > 0 ? text : null;
-}

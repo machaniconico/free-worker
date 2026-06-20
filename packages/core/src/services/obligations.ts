@@ -1,6 +1,7 @@
 import { writeAudit } from '../audit.js';
 import type { DB } from '../db/connection.js';
 import { dueStatus, type DueStatus, type IsoDate } from '../util/dates.js';
+import { nullableText, requireText } from '../util/validate.js';
 
 export interface Obligation {
   id: number;
@@ -136,11 +137,11 @@ function normalizeCreate(input: CreateObligationInput): Required<CreateObligatio
   return {
     category,
     title,
-    description: toNullableText(input.description),
-    dueDate: toNullableText(input.dueDate),
-    recurrence: toNullableText(input.recurrence),
-    status: toNullableText(input.status) ?? '未着手',
-    sourceId: toNullableText(input.sourceId),
+    description: nullableText(input.description),
+    dueDate: nullableText(input.dueDate),
+    recurrence: nullableText(input.recurrence),
+    status: nullableText(input.status) ?? '未着手',
+    sourceId: nullableText(input.sourceId),
     evidenceAttachmentId: input.evidenceAttachmentId ?? null,
   };
 }
@@ -149,25 +150,13 @@ function normalizeUpdate(input: UpdateObligationInput): UpdateObligationInput {
   const out: UpdateObligationInput = {};
   if (input.category !== undefined) out.category = requireText(input.category, 'category');
   if (input.title !== undefined) out.title = requireText(input.title, 'title');
-  if (input.description !== undefined) out.description = toNullableText(input.description);
-  if (input.dueDate !== undefined) out.dueDate = toNullableText(input.dueDate);
-  if (input.recurrence !== undefined) out.recurrence = toNullableText(input.recurrence);
+  if (input.description !== undefined) out.description = nullableText(input.description);
+  if (input.dueDate !== undefined) out.dueDate = nullableText(input.dueDate);
+  if (input.recurrence !== undefined) out.recurrence = nullableText(input.recurrence);
   if (input.status !== undefined) out.status = requireText(input.status, 'status');
-  if (input.sourceId !== undefined) out.sourceId = toNullableText(input.sourceId);
+  if (input.sourceId !== undefined) out.sourceId = nullableText(input.sourceId);
   if (input.evidenceAttachmentId !== undefined) out.evidenceAttachmentId = input.evidenceAttachmentId;
   return out;
-}
-
-function requireText(value: string | null | undefined, field: string): string {
-  const text = toNullableText(value);
-  if (!text) throw new Error(`${field} is required`);
-  return text;
-}
-
-function toNullableText(value: string | null | undefined): string | null {
-  if (value == null) return null;
-  const text = value.trim();
-  return text.length > 0 ? text : null;
 }
 
 function mapRow(row: ObligationRow): Obligation {

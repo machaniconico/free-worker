@@ -1,5 +1,6 @@
 import { writeAudit } from '../audit.js';
 import type { DB } from '../db/connection.js';
+import { hasText, nullableText, requirePositiveInteger, requireText } from '../util/validate.js';
 
 export type ProductType = 'download' | 'course' | 'membership' | 'template' | 'service' | 'other';
 export type BillingPeriod = 'monthly' | 'yearly' | 'one_time' | 'other';
@@ -462,29 +463,8 @@ function requirePrice(value: number): number {
   return value;
 }
 
-function requirePositiveInteger(value: number, field: string): number {
-  if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`${field} must be a positive integer`);
-  return value;
-}
-
 function normalizeCurrency(value: string | null | undefined): string {
   return nullableText(value) ?? 'JPY';
-}
-
-function requireText(value: string | null | undefined, field: string): string {
-  const text = nullableText(value);
-  if (!text) throw new Error(`${field} is required`);
-  return text;
-}
-
-function nullableText(value: string | null | undefined): string | null {
-  if (value == null) return null;
-  const text = value.trim();
-  return text.length > 0 ? text : null;
-}
-
-function hasText(value: string | null | undefined): boolean {
-  return nullableText(value) !== null;
 }
 
 // 税込単価 × 数量などの下流計算で安全整数域を超えないよう、現実的な上限を設ける。

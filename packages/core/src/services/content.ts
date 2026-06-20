@@ -1,5 +1,6 @@
 import { writeAudit } from '../audit.js';
 import type { DB } from '../db/connection.js';
+import { nullableText, requirePositiveInteger, requireText } from '../util/validate.js';
 import {
   checkProductCompleteness,
   getProduct,
@@ -471,26 +472,9 @@ function requireTaskPriority(value: ContentTaskPriority): ContentTaskPriority {
   return value;
 }
 
-function requirePositiveInteger(value: number, field: string): number {
-  if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`${field} must be a positive integer`);
-  return value;
-}
-
 function nullablePositiveInteger(value: number | null | undefined, field: string): number | null {
   if (value == null) return null;
   return requirePositiveInteger(value, field);
-}
-
-function requireText(value: string | null | undefined, field: string): string {
-  const text = nullableText(value);
-  if (!text) throw new Error(`${field} is required`);
-  return text;
-}
-
-function nullableText(value: string | null | undefined): string | null {
-  if (value == null) return null;
-  const text = value.trim();
-  return text.length > 0 ? text : null;
 }
 
 function mapProject(row: ContentProjectRow): ContentProject {
