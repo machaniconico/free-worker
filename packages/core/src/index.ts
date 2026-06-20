@@ -28,6 +28,8 @@ export * from './services/legal-generator.js';
 export * from './services/tax-report.js';
 export * from './services/agenda.js';
 export * from './services/invoice-view.js';
+export * from './services/quotes.js';
+export * from './services/ar-aging.js';
 
 // シード
 export * from './seed/checklist.js';

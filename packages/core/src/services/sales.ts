@@ -43,6 +43,7 @@ export interface Order {
   channel: string;
   subtotalTaxIncluded: number;
   taxAmount: number | null;
+  withholdingTax: number | null;
   paymentStatus: PaymentStatus;
   deliveryStatus: DeliveryStatus;
   refundStatus: RefundStatus;
@@ -72,6 +73,7 @@ export interface CreateOrderInput {
   channel: string;
   subtotalTaxIncluded: number;
   taxAmount?: number | null;
+  withholdingTax?: number | null;
   paymentStatus?: PaymentStatus;
   deliveryStatus?: DeliveryStatus;
   refundStatus?: RefundStatus;
@@ -105,6 +107,7 @@ interface OrderRow {
   channel: string;
   subtotal_tax_included: number;
   tax_amount: number | null;
+  withholding_tax: number | null;
   payment_status: string;
   delivery_status: string;
   refund_status: string;
@@ -147,6 +150,7 @@ const CSV_COLUMNS = [
   'qualifiedInvoiceFlag',
   'taxRateSummary',
   'attachmentId',
+  'withholdingTax',
 ];
 
 export function createOrder(db: DB, input: CreateOrderInput, actor = 'local_user'): Order {
@@ -156,10 +160,10 @@ export function createOrder(db: DB, input: CreateOrderInput, actor = 'local_user
       .prepare(
         `INSERT INTO orders
           (order_no, customer_id, ordered_at, channel, subtotal_tax_included, tax_amount,
-           payment_status, delivery_status, refund_status)
+           withholding_tax, payment_status, delivery_status, refund_status)
          VALUES
           (@orderNo, @customerId, @orderedAt, @channel, @subtotalTaxIncluded, @taxAmount,
-           @paymentStatus, @deliveryStatus, @refundStatus)`,
+           @withholdingTax, @paymentStatus, @deliveryStatus, @refundStatus)`,
       )
       .run(payload);
     const orderId = Number(result.lastInsertRowid);
@@ -197,6 +201,7 @@ export function updateOrder(db: DB, id: number, input: UpdateOrderInput, actor =
              ELSE subtotal_tax_included
            END,
            tax_amount = CASE WHEN @hasTaxAmount = 1 THEN @taxAmount ELSE tax_amount END,
+           withholding_tax = CASE WHEN @hasWithholdingTax = 1 THEN @withholdingTax ELSE withholding_tax END,
            payment_status = CASE WHEN @hasPaymentStatus = 1 THEN @paymentStatus ELSE payment_status END,
            delivery_status = CASE WHEN @hasDeliveryStatus = 1 THEN @deliveryStatus ELSE delivery_status END,
            refund_status = CASE WHEN @hasRefundStatus = 1 THEN @refundStatus ELSE refund_status END
@@ -257,6 +262,7 @@ export function exportOrdersCsv(db: DB): string {
     qualifiedInvoiceFlag: order.invoice ? (order.invoice.qualifiedInvoiceFlag ? '1' : '0') : '',
     taxRateSummary: order.invoice?.taxRateSummary ?? '',
     attachmentId: numberToCell(order.invoice?.attachmentId ?? null),
+    withholdingTax: numberToCell(order.withholdingTax),
   }));
   return serializeCsv(rows, { columns: CSV_COLUMNS, bom: false });
 }
@@ -327,6 +333,8 @@ function normalizeCreate(input: CreateOrderInput): Required<CreateOrderInput> {
     channel: requireText(input.channel, 'channel'),
     subtotalTaxIncluded: requireNonNegativeInteger(input.subtotalTaxIncluded, 'subtotalTaxIncluded'),
     taxAmount: input.taxAmount == null ? null : requireNonNegativeInteger(input.taxAmount, 'taxAmount'),
+    withholdingTax:
+      input.withholdingTax == null ? null : requireNonNegativeInteger(input.withholdingTax, 'withholdingTax'),
     paymentStatus: requireText(input.paymentStatus ?? 'pending', 'paymentStatus'),
     deliveryStatus: requireText(input.deliveryStatus ?? 'not_delivered', 'deliveryStatus'),
     refundStatus: requireText(input.refundStatus ?? 'none', 'refundStatus'),
@@ -355,6 +363,8 @@ function normalizeUpdate(input: UpdateOrderInput): {
     subtotalTaxIncluded: null,
     hasTaxAmount: 0,
     taxAmount: null,
+    hasWithholdingTax: 0,
+    withholdingTax: null,
     hasPaymentStatus: 0,
     paymentStatus: null,
     hasDeliveryStatus: 0,
@@ -378,6 +388,14 @@ function normalizeUpdate(input: UpdateOrderInput): {
   }
   if (input.taxAmount !== undefined) {
     setPatch(order, 'TaxAmount', 'taxAmount', input.taxAmount == null ? null : requireNonNegativeInteger(input.taxAmount, 'taxAmount'));
+  }
+  if (input.withholdingTax !== undefined) {
+    setPatch(
+      order,
+      'WithholdingTax',
+      'withholdingTax',
+      input.withholdingTax == null ? null : requireNonNegativeInteger(input.withholdingTax, 'withholdingTax'),
+    );
   }
   if (input.paymentStatus !== undefined) {
     setPatch(order, 'PaymentStatus', 'paymentStatus', requireText(input.paymentStatus, 'paymentStatus'));
@@ -466,6 +484,7 @@ function mapOrder(db: DB, row: OrderRow): Order {
     channel: row.channel,
     subtotalTaxIncluded: row.subtotal_tax_included,
     taxAmount: row.tax_amount,
+    withholdingTax: row.withholding_tax,
     paymentStatus: row.payment_status,
     deliveryStatus: row.delivery_status,
     refundStatus: row.refund_status,
@@ -514,6 +533,9 @@ function orderInputFromCsv(row: CsvRow): CreateOrderInput {
     subtotalTaxIncluded: cellToNonNegativeInteger(row.subtotalTaxIncluded, 'subtotalTaxIncluded'),
     taxAmount: row.taxAmount?.trim()
       ? requireNonNegativeInteger(cellToInteger(row.taxAmount, 'taxAmount'), 'taxAmount')
+      : null,
+    withholdingTax: row.withholdingTax?.trim()
+      ? requireNonNegativeInteger(cellToInteger(row.withholdingTax, 'withholdingTax'), 'withholdingTax')
       : null,
     paymentStatus: requireText(row.paymentStatus || 'pending', 'paymentStatus'),
     deliveryStatus: requireText(row.deliveryStatus || 'not_delivered', 'deliveryStatus'),

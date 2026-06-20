@@ -154,6 +154,36 @@ describe('salesRoutes', () => {
     expect(list.json()).toHaveLength(3);
   });
 
+  it('withholdingTax を含む注文の作成→取得で値が保持される', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/sales',
+      payload: {
+        orderNo: 'WH-ROUTE-001',
+        orderedAt: '2026-06-20',
+        channel: 'direct',
+        subtotalTaxIncluded: 100_000,
+        taxAmount: 9_090,
+        withholdingTax: 10_210,
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.json().withholdingTax).toBe(10_210);
+
+    const fetched = await app.inject({ method: 'GET', url: `/api/sales/${created.json().id}` });
+    expect(fetched.statusCode).toBe(200);
+    expect(fetched.json().withholdingTax).toBe(10_210);
+
+    // UPDATE で withholdingTax を変更できる
+    const updated = await app.inject({
+      method: 'PUT',
+      url: `/api/sales/${created.json().id}`,
+      payload: { withholdingTax: 5_105 },
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json().withholdingTax).toBe(5_105);
+  });
+
   it('不正な作成ペイロードは400', async () => {
     const res = await app.inject({ method: 'POST', url: '/api/sales', payload: { channel: 'direct' } });
     expect(res.statusCode).toBe(400);
@@ -206,6 +236,60 @@ describe('salesRoutes', () => {
     // delete が2件になっていないことを明示的に確認
     const deleteCount = afterDelete.filter((r) => r.action === 'delete').length;
     expect(deleteCount).toBe(1);
+  });
+
+  it('GET /api/sales/aging: 未入金注文を集計して返す', async () => {
+    const asOf = '2026-06-20';
+
+    // 10日前 pending → 0-30 バケット
+    await app.inject({
+      method: 'POST',
+      url: '/api/sales',
+      payload: { orderNo: 'AR-010', orderedAt: '2026-06-10', channel: 'direct', subtotalTaxIncluded: 1_000, paymentStatus: 'pending' },
+    });
+    // 45日前 overdue → 31-60 バケット
+    await app.inject({
+      method: 'POST',
+      url: '/api/sales',
+      payload: { orderNo: 'AR-045', orderedAt: '2026-05-06', channel: 'direct', subtotalTaxIncluded: 2_000, paymentStatus: 'overdue' },
+    });
+    // paid → 除外
+    await app.inject({
+      method: 'POST',
+      url: '/api/sales',
+      payload: { orderNo: 'AR-PAID', orderedAt: '2026-06-15', channel: 'direct', subtotalTaxIncluded: 9_999, paymentStatus: 'paid' },
+    });
+
+    const res = await app.inject({ method: 'GET', url: `/api/sales/aging?asOf=${asOf}` });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.asOf).toBe(asOf);
+    expect(body.buckets).toHaveLength(4);
+    expect(body.buckets.map((b: { label: string }) => b.label)).toEqual(['0-30', '31-60', '61-90', '90+']);
+    const byLabel = new Map(body.buckets.map((b: { label: string; count: number; amount: number }) => [b.label, b]));
+    expect(byLabel.get('0-30')).toMatchObject({ count: 1, amount: 1_000 });
+    expect(byLabel.get('31-60')).toMatchObject({ count: 1, amount: 2_000 });
+    expect(byLabel.get('61-90')).toMatchObject({ count: 0, amount: 0 });
+    expect(byLabel.get('90+')).toMatchObject({ count: 0, amount: 0 });
+    expect(body.total).toMatchObject({ count: 2, amount: 3_000 });
+    expect(body.orders).toHaveLength(2);
+    // orders は daysOutstanding 降順(古い=45日が先)
+    expect(body.orders[0].orderNo).toBe('AR-045');
+    expect(body.orders[1].orderNo).toBe('AR-010');
+  });
+
+  it('GET /api/sales/aging: asOf 未指定でも 200 が返る', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/sales/aging' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.asOf).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(body.buckets).toHaveLength(4);
+  });
+
+  it('GET /api/sales/aging: 不正な asOf は 400 invalid_asof を返す', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/sales/aging?asOf=not-a-date' });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe('invalid_asof');
   });
 
   it('PATCH ステータス更新: 非文字列 status は 400 invalid_payload を返す', async () => {

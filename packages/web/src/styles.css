@@ -119,7 +119,9 @@ h2 { font-size: 16px; margin: 0 0 12px; }
 .badge-ok      { background: rgba(43,191,138,0.15); color: var(--accent-2); border: 1px solid rgba(43,191,138,0.35); }
 .badge-warn    { background: rgba(255,186,64,0.15); color: #ffba40; border: 1px solid rgba(255,186,64,0.35); }
 .badge-danger  { background: rgba(255,107,107,0.15); color: var(--danger); border: 1px solid rgba(255,107,107,0.35); }
-.badge-muted   { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+.badge-muted      { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+.badge-info       { background: rgba(79,140,255,0.15); color: var(--accent); border: 1px solid rgba(79,140,255,0.35); }
+.badge-converted  { background: rgba(79,140,255,0.25); color: var(--accent); border: 1px solid var(--accent); font-weight: 700; }
 
 /* ── KPI grid (dashboard) ── */
 .kpi-grid {

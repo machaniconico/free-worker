@@ -7,6 +7,7 @@ interface AnnualReportMonth {
   taxAmount: number;
   expenseTaxIncluded: number;
   grossProfit: number;
+  withholdingTax: number;
 }
 
 interface AnnualReport {
@@ -15,11 +16,13 @@ interface AnnualReport {
   taxAmountTotal: number;
   expenseTotal: number;
   grossProfit: number;
+  withholdingTotal: number;
   totals: {
     salesTaxIncluded: number;
     taxAmount: number;
     expenseTaxIncluded: number;
     grossProfit: number;
+    withholdingTax: number;
   };
   months: AnnualReportMonth[];
 }
@@ -95,6 +98,13 @@ export function TaxReportPage() {
               <div className="kpi-label">年間粗利</div>
               <div className="kpi-value">{fmtYen(report.totals.grossProfit)}</div>
             </div>
+            <div className="kpi-card">
+              <div className="kpi-label">源泉徴収税合計(前払い分)</div>
+              <div className="kpi-value">{fmtYen(report.totals.withholdingTax ?? report.withholdingTotal ?? 0)}</div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                確定申告で所得税の前払いとして控除できます
+              </div>
+            </div>
           </div>
 
           {report.months.length > 0 && (
@@ -108,6 +118,7 @@ export function TaxReportPage() {
                     <th style={{ textAlign: 'right' }}>消費税</th>
                     <th style={{ textAlign: 'right' }}>経費(税込)</th>
                     <th style={{ textAlign: 'right' }}>粗利</th>
+                    <th style={{ textAlign: 'right' }}>源泉徴収</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -120,6 +131,9 @@ export function TaxReportPage() {
                       <td style={{ textAlign: 'right', color: m.grossProfit >= 0 ? 'var(--accent-2)' : 'var(--danger)' }}>
                         {fmtYen(m.grossProfit)}
                       </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {m.withholdingTax != null && m.withholdingTax > 0 ? fmtYen(m.withholdingTax) : '—'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -131,6 +145,9 @@ export function TaxReportPage() {
                     <td style={{ textAlign: 'right' }}>{fmtYen(report.totals.expenseTaxIncluded)}</td>
                     <td style={{ textAlign: 'right', color: report.totals.grossProfit >= 0 ? 'var(--accent-2)' : 'var(--danger)' }}>
                       {fmtYen(report.totals.grossProfit)}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {fmtYen(report.totals.withholdingTax ?? report.withholdingTotal ?? 0)}
                     </td>
                   </tr>
                 </tfoot>
