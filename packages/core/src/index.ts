@@ -30,6 +30,7 @@ export * from './services/agenda.js';
 export * from './services/invoice-view.js';
 export * from './services/quotes.js';
 export * from './services/ar-aging.js';
+export * from './services/recurring-billing.js';
 
 // シード
 export * from './seed/checklist.js';

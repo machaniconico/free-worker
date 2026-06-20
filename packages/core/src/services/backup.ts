@@ -98,6 +98,7 @@ const MAIN_TABLES = [
   'subscription_plans',
   'orders',
   'order_items',
+  'recurring_billings',
   'invoices',
   'audit_logs',
   'backup_history',
