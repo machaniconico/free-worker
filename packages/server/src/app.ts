@@ -32,7 +32,7 @@ declare module 'fastify' {
  * ネットワークへ出るプラグインは一切登録しない。
  */
 export function buildApp(config: ServerConfig, db?: DB): FastifyInstance {
-  const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' } });
+  const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, bodyLimit: 16 * 1024 * 1024 });
   const database = db ?? bootstrap({ filename: config.dbFile });
 
   app.decorate('db', database);

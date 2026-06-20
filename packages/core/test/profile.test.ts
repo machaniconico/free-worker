@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { describe, it, expect } from 'vitest';
 import { bootstrap } from '../src/db/bootstrap.js';
 import {
@@ -87,6 +88,60 @@ describe('business profile service', () => {
 
     const count = db.prepare('SELECT COUNT(*) AS n FROM audit_logs').get() as { n: number };
     expect(count.n).toBe(0);
+
+    db.close();
+  });
+
+  it('監査ログの before_json/after_json に invoiceRegistrationNumber の平文が含まれない(ハッシュ化)', () => {
+    const db = bootstrap({ filename: ':memory:' });
+    const rawNumber = 'T9876543210123';
+    const expectedHash = createHash('sha256').update(rawNumber).digest('hex');
+
+    // create
+    const created = createProfile(db, {
+      tradeName: 'ハッシュテスト事業者',
+      invoiceRegistrationNumber: rawNumber,
+    });
+    // business_profiles テーブルの本体は平文で保持する
+    expect(getProfile(db, created.id)?.invoiceRegistrationNumber).toBe(rawNumber);
+
+    // update (番号を変えてみる)
+    const updatedNumber = 'T1111111111111';
+    updateProfile(db, created.id, { invoiceRegistrationNumber: updatedNumber });
+
+    // delete
+    deleteProfile(db, created.id);
+
+    const audits = db
+      .prepare(
+        `SELECT action, before_json, after_json FROM audit_logs
+         WHERE entity_type = 'business_profile' ORDER BY id ASC`,
+      )
+      .all() as Array<{ action: string; before_json: string | null; after_json: string | null }>;
+
+    expect(audits.map((r) => r.action)).toEqual(['create', 'update', 'delete']);
+
+    // create の after_json: 平文番号を含まず、ハッシュを含む
+    const createAfter = audits[0]!.after_json!;
+    expect(createAfter).not.toContain(rawNumber);
+    expect(JSON.parse(createAfter)).toMatchObject({ invoiceRegistrationNumber: expectedHash });
+
+    // update の before_json/after_json: それぞれ平文を含まず、ハッシュ化
+    const updateBefore = audits[1]!.before_json!;
+    const updateAfter = audits[1]!.after_json!;
+    expect(updateBefore).not.toContain(rawNumber);
+    expect(updateAfter).not.toContain(updatedNumber);
+    expect(JSON.parse(updateBefore)).toMatchObject({
+      invoiceRegistrationNumber: expectedHash,
+    });
+    const updatedHash = createHash('sha256').update(updatedNumber).digest('hex');
+    expect(JSON.parse(updateAfter)).toMatchObject({
+      invoiceRegistrationNumber: updatedHash,
+    });
+
+    // delete の before_json: 平文を含まない
+    const deleteBefore = audits[2]!.before_json!;
+    expect(deleteBefore).not.toContain(updatedNumber);
 
     db.close();
   });

@@ -97,6 +97,31 @@ describe('オフライン動作の保証(ネットワーク禁止下)', () => {
     expect(res.statusCode).toBe(200);
   });
 
+  it('DELETE操作(顧客削除)がネット遮断下でも正常動作し監査ログを残す(#21/#22)', async () => {
+    // 顧客を作成してから削除し、audit_logs に delete エントリが残ることを検証する
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/customers',
+      payload: { displayName: 'オフライン削除テスト客' },
+    });
+    expect([200, 201]).toContain(created.statusCode);
+    const customerId = created.json().id as number;
+
+    // DELETE
+    const deleted = await app.inject({
+      method: 'DELETE',
+      url: `/api/customers/${customerId}`,
+    });
+    expect([200, 204]).toContain(deleted.statusCode);
+
+    // 監査ログに delete が記録されていることを確認(#21)
+    const auditRes = await app.inject({ method: 'GET', url: '/api/audit' });
+    expect(auditRes.statusCode).toBe(200);
+    const logs = auditRes.json() as Array<{ action: string; entityType: string }>;
+    const deleteLog = logs.find((l) => l.action === 'delete' && l.entityType === 'customer');
+    expect(deleteLog).toBeDefined();
+  });
+
   it('EPIC-10 暗号化バックアップ: 作成→復元テストが成功する', async () => {
     const passphrase = 'offline-pass-1234';
     const created = await app.inject({

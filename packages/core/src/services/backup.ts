@@ -365,9 +365,13 @@ function readIntegrityCheck(db: DB): string {
 function countMainTables(db: DB): Record<string, number> {
   const counts: Record<string, number> = {};
   const tableExists = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?");
+  // Prepare count statements once before the loop (table names are a fixed constant set).
+  const countStmts = Object.fromEntries(
+    MAIN_TABLES.map((t) => [t, db.prepare(`SELECT COUNT(*) AS n FROM ${t}`)]),
+  );
   for (const table of MAIN_TABLES) {
     if (!tableExists.get(table)) continue;
-    const row = db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number };
+    const row = countStmts[table]!.get() as { n: number };
     counts[table] = row.n;
   }
   return counts;
