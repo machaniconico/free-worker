@@ -1,7 +1,7 @@
 import { writeAudit } from '../audit.js';
 import type { DB } from '../db/connection.js';
 import { dueStatus, type DueStatus, type IsoDate } from '../util/dates.js';
-import { nullableText, requireText } from '../util/validate.js';
+import { nullableText, requireTextCoded } from '../util/validate.js';
 
 export interface Obligation {
   id: number;
@@ -132,8 +132,8 @@ function getObligationOrThrow(db: DB, id: number): Obligation {
 }
 
 function normalizeCreate(input: CreateObligationInput): Required<CreateObligationInput> {
-  const category = requireText(input.category, 'category');
-  const title = requireText(input.title, 'title');
+  const category = requireTextCoded(input.category, 'category', 'category_required');
+  const title = requireTextCoded(input.title, 'title', 'title_required');
   return {
     category,
     title,
@@ -148,12 +148,12 @@ function normalizeCreate(input: CreateObligationInput): Required<CreateObligatio
 
 function normalizeUpdate(input: UpdateObligationInput): UpdateObligationInput {
   const out: UpdateObligationInput = {};
-  if (input.category !== undefined) out.category = requireText(input.category, 'category');
-  if (input.title !== undefined) out.title = requireText(input.title, 'title');
+  if (input.category !== undefined) out.category = requireTextCoded(input.category, 'category', 'category_required');
+  if (input.title !== undefined) out.title = requireTextCoded(input.title, 'title', 'title_required');
   if (input.description !== undefined) out.description = nullableText(input.description);
   if (input.dueDate !== undefined) out.dueDate = nullableText(input.dueDate);
   if (input.recurrence !== undefined) out.recurrence = nullableText(input.recurrence);
-  if (input.status !== undefined) out.status = requireText(input.status, 'status');
+  if (input.status !== undefined) out.status = requireTextCoded(input.status, 'status', 'status_required');
   if (input.sourceId !== undefined) out.sourceId = nullableText(input.sourceId);
   if (input.evidenceAttachmentId !== undefined) out.evidenceAttachmentId = input.evidenceAttachmentId;
   return out;
