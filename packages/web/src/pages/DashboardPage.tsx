@@ -1,6 +1,31 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 
+interface AgingBucket {
+  label: '0-30' | '31-60' | '61-90' | '90+';
+  count: number;
+  amount: number;
+}
+
+interface AgingOrder {
+  id: string;
+  orderNo: string;
+  orderedAt: string;
+  customerId: string;
+  customerName: string;
+  amount: number;
+  daysOutstanding: number;
+  bucket: '0-30' | '31-60' | '61-90' | '90+';
+  paymentStatus: string;
+}
+
+interface AgingReport {
+  asOf: string;
+  buckets: AgingBucket[];
+  total: { count: number; amount: number };
+  orders: AgingOrder[];
+}
+
 interface SalesSummary {
   month: string;
   totalSales: number;
@@ -78,6 +103,8 @@ export function DashboardPage() {
   const [obligations, setObligations] = useState<Obligation[]>([]);
   const [agenda, setAgenda] = useState<Agenda | null>(null);
   const [agendaError, setAgendaError] = useState<string | null>(null);
+  const [aging, setAging] = useState<AgingReport | null>(null);
+  const [agingError, setAgingError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -86,6 +113,13 @@ export function DashboardPage() {
     api.get<Agenda>(`/api/agenda?today=${todayStr()}`)
       .then(setAgenda)
       .catch((e: unknown) => setAgendaError(String(e)));
+  }, []);
+
+  // Load aging report once on mount (asOf = today, independent of month selector)
+  useEffect(() => {
+    api.get<AgingReport>(`/api/sales/aging?asOf=${todayStr()}`)
+      .then(setAging)
+      .catch((e: unknown) => setAgingError(String(e)));
   }, []);
 
   useEffect(() => {
@@ -262,6 +296,118 @@ export function DashboardPage() {
           <p style={{ color: 'var(--muted)' }}>期限切れ・期限間近の項目はありません。</p>
         </section>
       )}
+
+      {/* ── 売掛金エイジング(未入金) ── */}
+      <section className="card">
+        <h2>売掛金エイジング(未入金)</h2>
+        {agingError && (
+          <p style={{ color: 'var(--muted)', fontSize: 13 }}>エイジング取得エラー: {agingError}</p>
+        )}
+        {!agingError && aging === null && (
+          <p style={{ color: 'var(--muted)', fontSize: 13 }}>読み込み中…</p>
+        )}
+        {aging !== null && (
+          <>
+            {/* バケット表 */}
+            <table className="data-table" style={{ marginBottom: 20 }}>
+              <thead>
+                <tr>
+                  <th>経過日数</th>
+                  <th style={{ textAlign: 'right' }}>件数</th>
+                  <th style={{ textAlign: 'right' }}>金額(税込)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {aging.buckets.map((b) => (
+                  <tr key={b.label}>
+                    <td>
+                      {b.label === '90+' ? (
+                        <span style={{ color: 'var(--danger)', fontWeight: 600 }}>
+                          {b.label}日
+                        </span>
+                      ) : (
+                        <span>{b.label}日</span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {b.label === '90+' && b.count > 0 ? (
+                        <span style={{ color: 'var(--danger)', fontWeight: 600 }}>{b.count}件</span>
+                      ) : (
+                        `${b.count}件`
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {b.label === '90+' && b.amount > 0 ? (
+                        <span style={{ color: 'var(--danger)', fontWeight: 600 }}>{fmtYen(b.amount)}</span>
+                      ) : (
+                        fmtYen(b.amount)
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {/* 合計行 */}
+                <tr style={{ borderTop: '2px solid var(--border)' }}>
+                  <td style={{ fontWeight: 600 }}>合計</td>
+                  <td style={{ textAlign: 'right', fontWeight: 600 }}>{aging.total.count}件</td>
+                  <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmtYen(aging.total.amount)}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            {/* 督促候補リスト */}
+            <h2 style={{ marginTop: 0, marginBottom: 10, fontSize: 14, color: 'var(--muted)', fontWeight: 600 }}>
+              督促候補(経過日数の長い順)
+            </h2>
+            {aging.orders.length === 0 ? (
+              <p style={{ color: 'var(--accent-2)', margin: 0 }}>
+                ✓ 未入金の売掛はありません
+              </p>
+            ) : (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>顧客名 / 注文番号</th>
+                    <th>発行日</th>
+                    <th style={{ textAlign: 'right' }}>経過</th>
+                    <th style={{ textAlign: 'right' }}>金額(税込)</th>
+                    <th>状態</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {aging.orders.slice(0, 10).map((o) => (
+                    <tr key={o.id}>
+                      <td>
+                        <div style={{ fontWeight: 500 }}>{o.customerName}</div>
+                        <div style={{ fontSize: 12, color: 'var(--muted)' }}>{o.orderNo}</div>
+                      </td>
+                      <td style={{ color: 'var(--muted)', fontSize: 13 }}>{o.orderedAt}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        {o.bucket === '90+' ? (
+                          <span style={{ color: 'var(--danger)', fontWeight: 700 }}>{o.daysOutstanding}日</span>
+                        ) : o.bucket === '61-90' ? (
+                          <span style={{ color: '#ffba40', fontWeight: 600 }}>{o.daysOutstanding}日</span>
+                        ) : (
+                          <span style={{ color: 'var(--muted)' }}>{o.daysOutstanding}日</span>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{fmtYen(o.amount)}</td>
+                      <td>
+                        {o.bucket === '90+' ? (
+                          <span className="badge badge-danger">{o.paymentStatus}</span>
+                        ) : o.bucket === '61-90' ? (
+                          <span className="badge badge-warn">{o.paymentStatus}</span>
+                        ) : (
+                          <span className="badge badge-default">{o.paymentStatus}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
+        )}
+      </section>
     </div>
   );
 }

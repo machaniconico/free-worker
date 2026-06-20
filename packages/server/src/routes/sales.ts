@@ -11,6 +11,7 @@ import {
   monthlySummary,
   exportOrdersCsv,
   importOrdersCsv,
+  accountsReceivableAging,
   type Order,
   type CreateOrderInput,
   type UpdateOrderInput,
@@ -23,6 +24,10 @@ interface IdParams {
 
 interface SummaryQuery {
   month?: string;
+}
+
+interface AgingQuery {
+  asOf?: string;
 }
 
 function parseId(id: string): number | null {
@@ -77,6 +82,20 @@ export async function salesRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: SummaryQuery }>('/api/sales/summary', async (req, reply) => {
     try {
       return monthlySummary(app.db, req.query.month);
+    } catch {
+      reply.code(500);
+      return { error: 'internal_error' };
+    }
+  });
+
+  app.get<{ Querystring: AgingQuery }>('/api/sales/aging', async (req, reply) => {
+    const { asOf } = req.query;
+    if (asOf !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(asOf)) {
+      reply.code(400);
+      return { error: 'invalid_asof' };
+    }
+    try {
+      return accountsReceivableAging(app.db, asOf);
     } catch {
       reply.code(500);
       return { error: 'internal_error' };
