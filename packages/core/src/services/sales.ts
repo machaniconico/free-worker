@@ -2,7 +2,15 @@ import { writeAudit } from '../audit.js';
 import type { DB } from '../db/connection.js';
 import { parseCsv, serializeCsv, type CsvRow } from '../util/csv.js';
 import { yearMonth } from '../util/dates.js';
-import { cellToInteger, cellToNullableInteger, nullableText, requireText } from '../util/validate.js';
+import {
+  cellToInteger,
+  cellToNonNegativeInteger,
+  cellToNullableInteger,
+  nullableText,
+  requireNonNegativeInteger,
+  requirePositiveInteger,
+  requireText,
+} from '../util/validate.js';
 
 export type PaymentStatus = 'pending' | 'paid' | 'overdue' | 'cancelled' | string;
 export type DeliveryStatus = 'not_delivered' | 'delivered' | 'cancelled' | string;
@@ -314,8 +322,8 @@ function normalizeCreate(input: CreateOrderInput): Required<CreateOrderInput> {
     customerId: nullableInteger(input.customerId, 'customerId'),
     orderedAt: requireText(input.orderedAt, 'orderedAt'),
     channel: requireText(input.channel, 'channel'),
-    subtotalTaxIncluded: requireInteger(input.subtotalTaxIncluded, 'subtotalTaxIncluded'),
-    taxAmount: nullableInteger(input.taxAmount, 'taxAmount'),
+    subtotalTaxIncluded: requireNonNegativeInteger(input.subtotalTaxIncluded, 'subtotalTaxIncluded'),
+    taxAmount: input.taxAmount == null ? null : requireNonNegativeInteger(input.taxAmount, 'taxAmount'),
     paymentStatus: requireText(input.paymentStatus ?? 'pending', 'paymentStatus'),
     deliveryStatus: requireText(input.deliveryStatus ?? 'not_delivered', 'deliveryStatus'),
     refundStatus: requireText(input.refundStatus ?? 'none', 'refundStatus'),
@@ -362,10 +370,12 @@ function normalizeUpdate(input: UpdateOrderInput): {
       order,
       'SubtotalTaxIncluded',
       'subtotalTaxIncluded',
-      requireInteger(input.subtotalTaxIncluded, 'subtotalTaxIncluded'),
+      requireNonNegativeInteger(input.subtotalTaxIncluded, 'subtotalTaxIncluded'),
     );
   }
-  if (input.taxAmount !== undefined) setPatch(order, 'TaxAmount', 'taxAmount', nullableInteger(input.taxAmount, 'taxAmount'));
+  if (input.taxAmount !== undefined) {
+    setPatch(order, 'TaxAmount', 'taxAmount', input.taxAmount == null ? null : requireNonNegativeInteger(input.taxAmount, 'taxAmount'));
+  }
   if (input.paymentStatus !== undefined) {
     setPatch(order, 'PaymentStatus', 'paymentStatus', requireText(input.paymentStatus, 'paymentStatus'));
   }
@@ -396,9 +406,9 @@ function setPatch(
 
 function normalizeItems(items: OrderItemInput[]): OrderItemInput[] {
   return items.map((item) => ({
-    productId: requireInteger(item.productId, 'productId'),
-    quantity: requireInteger(item.quantity ?? 1, 'quantity'),
-    unitPriceTaxIncluded: requireInteger(item.unitPriceTaxIncluded, 'unitPriceTaxIncluded'),
+    productId: requirePositiveInteger(item.productId, 'productId'),
+    quantity: requirePositiveInteger(item.quantity ?? 1, 'quantity'),
+    unitPriceTaxIncluded: requireNonNegativeInteger(item.unitPriceTaxIncluded, 'unitPriceTaxIncluded'),
   }));
 }
 
@@ -498,8 +508,10 @@ function orderInputFromCsv(row: CsvRow): CreateOrderInput {
     customerId: cellToNullableInteger(row.customerId, 'customerId'),
     orderedAt: requireText(row.orderedAt, 'orderedAt'),
     channel: requireText(row.channel, 'channel'),
-    subtotalTaxIncluded: cellToInteger(row.subtotalTaxIncluded, 'subtotalTaxIncluded'),
-    taxAmount: cellToNullableInteger(row.taxAmount, 'taxAmount'),
+    subtotalTaxIncluded: cellToNonNegativeInteger(row.subtotalTaxIncluded, 'subtotalTaxIncluded'),
+    taxAmount: row.taxAmount?.trim()
+      ? requireNonNegativeInteger(cellToInteger(row.taxAmount, 'taxAmount'), 'taxAmount')
+      : null,
     paymentStatus: requireText(row.paymentStatus || 'pending', 'paymentStatus'),
     deliveryStatus: requireText(row.deliveryStatus || 'not_delivered', 'deliveryStatus'),
     refundStatus: requireText(row.refundStatus || 'none', 'refundStatus'),
@@ -523,10 +535,12 @@ function parseItemsJson(value: string | undefined): OrderItemInput[] {
   if (!Array.isArray(parsed)) throw new Error('itemsJson must be an array');
   return parsed.map((item) => {
     const candidate = item as Partial<OrderItemInput>;
+    if (candidate.productId == null) throw new Error('productId is required');
+    if (candidate.unitPriceTaxIncluded == null) throw new Error('unitPriceTaxIncluded is required');
     return {
-      productId: requireInteger(candidate.productId, 'productId'),
-      quantity: requireInteger(candidate.quantity ?? 1, 'quantity'),
-      unitPriceTaxIncluded: requireInteger(candidate.unitPriceTaxIncluded, 'unitPriceTaxIncluded'),
+      productId: requirePositiveInteger(candidate.productId, 'productId'),
+      quantity: requirePositiveInteger(candidate.quantity ?? 1, 'quantity'),
+      unitPriceTaxIncluded: requireNonNegativeInteger(candidate.unitPriceTaxIncluded, 'unitPriceTaxIncluded'),
     };
   });
 }

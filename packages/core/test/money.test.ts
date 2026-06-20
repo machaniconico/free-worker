@@ -42,6 +42,12 @@ describe('money', () => {
     expect(() => taxFromInclusive(100.5)).toThrow();
   });
 
+  it('2^53超の大整数(精度喪失)は拒否', () => {
+    const unsafe = Number.MAX_SAFE_INTEGER + 1; // 9007199254740992
+    expect(() => taxFromInclusive(unsafe)).toThrow();
+    expect(() => inclusiveFromExclusive(unsafe)).toThrow();
+  });
+
   it('円表記', () => {
     expect(formatYen(1280)).toBe('¥1,280');
     expect(formatYen(-500)).toBe('-¥500');

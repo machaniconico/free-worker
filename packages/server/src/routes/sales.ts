@@ -65,15 +65,32 @@ async function patchStatus(
 }
 
 export async function salesRoutes(app: FastifyInstance): Promise<void> {
-  app.get('/api/sales', async () => listOrders(app.db));
+  app.get('/api/sales', async (_req, reply) => {
+    try {
+      return listOrders(app.db);
+    } catch {
+      reply.code(500);
+      return { error: 'internal_error' };
+    }
+  });
 
-  app.get<{ Querystring: SummaryQuery }>('/api/sales/summary', async (req) =>
-    monthlySummary(app.db, req.query.month),
-  );
+  app.get<{ Querystring: SummaryQuery }>('/api/sales/summary', async (req, reply) => {
+    try {
+      return monthlySummary(app.db, req.query.month);
+    } catch {
+      reply.code(500);
+      return { error: 'internal_error' };
+    }
+  });
 
   app.get('/api/sales/export', async (_req, reply) => {
-    reply.header('content-type', 'text/csv; charset=utf-8');
-    return exportOrdersCsv(app.db);
+    try {
+      reply.header('content-type', 'text/csv; charset=utf-8');
+      return exportOrdersCsv(app.db);
+    } catch {
+      reply.code(500);
+      return { error: 'internal_error' };
+    }
   });
 
   app.post<{ Body: { csv?: unknown } }>('/api/sales/import', async (req, reply) => {

@@ -47,4 +47,14 @@ describe('db bootstrap (offline)', () => {
     expect(getAiConfig(db).provider).toBe('ollama');
     db.close();
   });
+
+  it('不正な provider はデフォルト(none)にフォールバックしアプリが壊れない', () => {
+    const db = bootstrap({ filename: ':memory:' });
+    // DB に直接不正な provider を書き込む
+    db.prepare(`INSERT INTO app_settings (key, value, updated_at) VALUES ('ai_config', '{"enabled":true,"provider":"invalid_provider"}', CURRENT_TIMESTAMP)`).run();
+    const config = getAiConfig(db);
+    expect(config.provider).toBe('none');
+    expect(config.enabled).toBe(true); // 他フィールドはそのまま
+    db.close();
+  });
 });

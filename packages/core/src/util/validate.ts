@@ -29,6 +29,12 @@ export function requirePositiveInteger(value: number, field: string): number {
   return value;
 }
 
+/** 非負の安全整数を要求する(0 は許容: 無料商品等)。 */
+export function requireNonNegativeInteger(value: number, field: string): number {
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${field} must be a non-negative integer`);
+  return value;
+}
+
 /** CSVセル文字列を整数にパースする。必須・整数でなければ投げる。 */
 export function cellToInteger(value: string | undefined, field: string): number {
   const text = requireText(value, field);
@@ -41,6 +47,13 @@ export function cellToInteger(value: string | undefined, field: string): number 
 export function cellToNullableInteger(value: string | undefined, field: string): number | null {
   if (!value?.trim()) return null;
   return cellToInteger(value, field);
+}
+
+/** CSVセル文字列を非負整数にパースする。必須・非負でなければ投げる。 */
+export function cellToNonNegativeInteger(value: string | undefined, field: string): number {
+  const parsed = cellToInteger(value, field);
+  if (parsed < 0) throw new Error(`${field} must be a non-negative integer`);
+  return parsed;
 }
 
 /** バリデーション失敗を型付きエラーコード付きで表す。message は requireText と同一に保つ（既存テスト非破壊）。 */

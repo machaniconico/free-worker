@@ -15,6 +15,14 @@ import {
   updateRefundStatus,
 } from '../src/services/sales.js';
 
+const BASE_ORDER = {
+  orderNo: 'ORD-VAL-001',
+  orderedAt: '2026-06-01',
+  channel: 'direct',
+  subtotalTaxIncluded: 1_000,
+  taxAmount: 100,
+} as const;
+
 describe('sales service', () => {
   it('注文CRUDとステータス更新で監査ログを記録する', () => {
     const db = bootstrap({ filename: ':memory:' });
@@ -159,6 +167,93 @@ describe('sales service', () => {
       },
     ]);
     expect(monthlySummary(db, '2026-06')).toHaveLength(1);
+    db.close();
+  });
+});
+
+describe('金額・数量バリデーション (characterization)', () => {
+  it('subtotalTaxIncluded=-1 で createOrder が throw する', () => {
+    const db = bootstrap({ filename: ':memory:' });
+    expect(() =>
+      createOrder(db, { ...BASE_ORDER, orderNo: 'ORD-V-01', subtotalTaxIncluded: -1 }),
+    ).toThrow(/non-negative/);
+    db.close();
+  });
+
+  it('unitPriceTaxIncluded=-1 で createOrder が throw する', () => {
+    const db = bootstrap({ filename: ':memory:' });
+    const productId = seedProduct(db);
+    expect(() =>
+      createOrder(db, {
+        ...BASE_ORDER,
+        orderNo: 'ORD-V-02',
+        items: [{ productId, quantity: 1, unitPriceTaxIncluded: -1 }],
+      }),
+    ).toThrow(/non-negative/);
+    db.close();
+  });
+
+  it('quantity=0 で createOrder が throw する', () => {
+    const db = bootstrap({ filename: ':memory:' });
+    const productId = seedProduct(db);
+    expect(() =>
+      createOrder(db, {
+        ...BASE_ORDER,
+        orderNo: 'ORD-V-03',
+        items: [{ productId, quantity: 0, unitPriceTaxIncluded: 1_000 }],
+      }),
+    ).toThrow(/positive/);
+    db.close();
+  });
+
+  it('quantity=-1 で createOrder が throw する', () => {
+    const db = bootstrap({ filename: ':memory:' });
+    const productId = seedProduct(db);
+    expect(() =>
+      createOrder(db, {
+        ...BASE_ORDER,
+        orderNo: 'ORD-V-04',
+        items: [{ productId, quantity: -1, unitPriceTaxIncluded: 1_000 }],
+      }),
+    ).toThrow(/positive/);
+    db.close();
+  });
+
+  it('taxAmount=-1 で createOrder が throw する', () => {
+    const db = bootstrap({ filename: ':memory:' });
+    expect(() =>
+      createOrder(db, { ...BASE_ORDER, orderNo: 'ORD-V-05', taxAmount: -1 }),
+    ).toThrow(/non-negative/);
+    db.close();
+  });
+
+  it('subtotalTaxIncluded=-1 で updateOrder が throw する', () => {
+    const db = bootstrap({ filename: ':memory:' });
+    const order = createOrder(db, { ...BASE_ORDER, orderNo: 'ORD-V-06' });
+    expect(() => updateOrder(db, order.id, { subtotalTaxIncluded: -1 })).toThrow(/non-negative/);
+    db.close();
+  });
+
+  it('taxAmount=-1 で updateOrder が throw する', () => {
+    const db = bootstrap({ filename: ':memory:' });
+    const order = createOrder(db, { ...BASE_ORDER, orderNo: 'ORD-V-07' });
+    expect(() => updateOrder(db, order.id, { taxAmount: -1 })).toThrow(/non-negative/);
+    db.close();
+  });
+
+  it('subtotalTaxIncluded=0 は許容される(無料商品)', () => {
+    const db = bootstrap({ filename: ':memory:' });
+    const order = createOrder(db, { ...BASE_ORDER, orderNo: 'ORD-V-08', subtotalTaxIncluded: 0, taxAmount: 0 });
+    expect(order.subtotalTaxIncluded).toBe(0);
+    db.close();
+  });
+
+  it('CSV取込で負の subtotalTaxIncluded を含む行は throw する', () => {
+    const csv =
+      'orderNo,customerId,orderedAt,channel,subtotalTaxIncluded,taxAmount,paymentStatus,deliveryStatus,refundStatus,itemsJson,invoiceNo,invoiceIssuedAt,buyerName,qualifiedInvoiceFlag,taxRateSummary,attachmentId\n' +
+      'ORD-CSV-NEG,,2026-06-01,direct,-500,,pending,not_delivered,none,,,,,,,' ;
+    const db = bootstrap({ filename: ':memory:' });
+    expect(() => importOrdersCsv(db, csv)).toThrow(/non-negative/);
     db.close();
   });
 });

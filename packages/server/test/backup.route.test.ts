@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -123,6 +123,44 @@ describe('backupRoutes', () => {
       payload: { passphrase: 'valid-passphrase', kind: 'external' },
     });
     expect(invalidKind.statusCode).toBe(400);
+  });
+
+  it('AAD保護: ヘッダを改竄したバックアップはrestore-testでfailureになる', async () => {
+    const passphrase = 'aad-tamper-passphrase';
+
+    // バックアップ作成
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/backup',
+      payload: { passphrase },
+    });
+    expect(created.statusCode).toBe(201);
+    const backup = created.json<{ filePath: string }>();
+
+    // 正常ファイルはrestore-testでsuccess
+    const normalTest = await app.inject({
+      method: 'POST',
+      url: '/api/backup/restore-test',
+      payload: { filePath: backup.filePath, passphrase },
+    });
+    expect(normalTest.statusCode).toBe(200);
+    expect(normalTest.json()).toMatchObject({ result: 'success' });
+
+    // ヘッダJSON内の 'free-worker' を 'evil-wrker' に同一長で書き換え(AAD改竄)
+    const raw = readFileSync(backup.filePath);
+    const idx = raw.indexOf(Buffer.from('free-worker'));
+    expect(idx).toBeGreaterThan(0);
+    Buffer.from('evil-wrker\0').copy(raw, idx); // 11バイト同一長
+    writeFileSync(backup.filePath, raw);
+
+    // 改竄後はrestore-testでfailure (GCM認証タグ不一致)
+    const tamperedTest = await app.inject({
+      method: 'POST',
+      url: '/api/backup/restore-test',
+      payload: { filePath: backup.filePath, passphrase },
+    });
+    expect(tamperedTest.statusCode).toBe(200);
+    expect(tamperedTest.json()).toMatchObject({ result: 'failure' });
   });
 });
 

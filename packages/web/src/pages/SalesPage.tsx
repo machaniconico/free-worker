@@ -53,13 +53,35 @@ export function SalesPage() {
     if (!file) return;
     const formData = new FormData();
     formData.append('file', file);
+    let res: Response;
     try {
-      const res = await fetch('/api/sales/import', { method: 'POST', body: formData });
-      const data = await res.json() as Record<string, unknown>;
-      setImportMsg(res.ok ? `インポート完了: ${JSON.stringify(data)}` : `エラー: ${JSON.stringify(data)}`);
+      res = await fetch('/api/sales/import', { method: 'POST', body: formData });
+    } catch {
+      setImportMsg('サーバーに接続できませんでした。ネットワークを確認してください。');
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
+    let data: Record<string, unknown>;
+    try {
+      data = await res.json() as Record<string, unknown>;
+    } catch {
+      setImportMsg('サーバー応答が不正です。管理者にお問い合わせください。');
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
+    if (!res.ok) {
+      const msg = typeof data['error'] === 'string' ? data['error'] : `APIエラー (${res.status})`;
+      setImportMsg(`インポート失敗: ${msg}`);
+    } else {
+      const imported = typeof data['imported'] === 'number' ? data['imported'] : '?';
+      const created = typeof data['created'] === 'number' ? data['created'] : undefined;
+      const updated = typeof data['updated'] === 'number' ? data['updated'] : undefined;
+      const detail = [
+        created !== undefined ? `新規 ${created} 件` : null,
+        updated !== undefined ? `更新 ${updated} 件` : null,
+      ].filter(Boolean).join('、');
+      setImportMsg(`インポート完了: ${imported} 件処理${detail ? `（${detail}）` : ''}`);
       load();
-    } catch (e: unknown) {
-      setImportMsg(String(e));
     }
     if (fileRef.current) fileRef.current.value = '';
   };

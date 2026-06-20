@@ -11,8 +11,6 @@
 
 // 数式メタ文字(先頭の空白・既存 ' を挟んでも検出)。または制御文字 TAB/CR 始まり。
 const FORMULA_META = /^[ \t\r]*'*[=+\-@]/;
-// 出力時にガードされたセル(先頭 ' に続けて、上記の数式パターン or 制御文字)。
-const GUARDED_FORMULA = /^'(?:[ \t\r]*'*[=+\-@]|[\t\r])/;
 
 function needsFormulaGuard(value: string): boolean {
   if (FORMULA_META.test(value)) return true;
@@ -24,8 +22,18 @@ function guardFormula(value: string): string {
   return needsFormulaGuard(value) ? `'${value}` : value;
 }
 
+/**
+ * guardFormula の厳密な逆操作。
+ * guardFormula は needsFormulaGuard(value) が真のとき先頭に `'` を1個付ける。
+ * よって逆は「先頭 `'` を除いた残りが needsFormulaGuard でマッチする場合のみ剥がす」。
+ * これにより TAB/CR 始まりガードも正しく剥がれ、`'hello` 等の正当な先頭クォートは
+ * 手を触れない(needsFormulaGuard("hello") = false のため)。
+ */
 function unguardFormula(value: string): string {
-  return GUARDED_FORMULA.test(value) ? value.slice(1) : value;
+  if (value.startsWith("'") && needsFormulaGuard(value.slice(1))) {
+    return value.slice(1);
+  }
+  return value;
 }
 
 export type CsvRow = Record<string, string>;

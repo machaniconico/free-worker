@@ -1,5 +1,12 @@
 import type { DB } from './db/connection.js';
-import { type AiConfig, DEFAULT_AI_CONFIG } from './ai/adapter.js';
+import { type AiConfig, type AiProvider, DEFAULT_AI_CONFIG } from './ai/adapter.js';
+
+const VALID_AI_PROVIDERS: ReadonlySet<AiProvider> = new Set<AiProvider>([
+  'none',
+  'ollama',
+  'lmstudio',
+  'gemini_flash',
+]);
 
 const AI_CONFIG_KEY = 'ai_config';
 
@@ -22,7 +29,12 @@ export function getAiConfig(db: DB): AiConfig {
   if (!raw) return { ...DEFAULT_AI_CONFIG };
   try {
     const parsed = JSON.parse(raw) as Partial<AiConfig>;
-    return { ...DEFAULT_AI_CONFIG, ...parsed };
+    const merged = { ...DEFAULT_AI_CONFIG, ...parsed };
+    // 不正な provider はデフォルトへフォールバック(throw せずグレースフル)。
+    if (!VALID_AI_PROVIDERS.has(merged.provider)) {
+      merged.provider = DEFAULT_AI_CONFIG.provider;
+    }
+    return merged;
   } catch {
     return { ...DEFAULT_AI_CONFIG };
   }
