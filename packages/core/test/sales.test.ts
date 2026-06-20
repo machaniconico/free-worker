@@ -155,6 +155,7 @@ describe('sales service', () => {
         taxAmount: 1_500,
         uncollectedAmount: 5_500,
         refundAmount: 5_500,
+        cancelledAmount: 0,
         orderCount: 2,
       },
       {
@@ -163,10 +164,44 @@ describe('sales service', () => {
         taxAmount: 300,
         uncollectedAmount: 3_300,
         refundAmount: 0,
+        cancelledAmount: 0,
         orderCount: 1,
       },
     ]);
     expect(monthlySummary(db, '2026-06')).toHaveLength(1);
+    db.close();
+  });
+
+  it('cancelledAmount は cancelled 注文の合計になり uncollectedAmount にも含まれる(後方互換)', () => {
+    const db = bootstrap({ filename: ':memory:' });
+    createOrder(db, {
+      orderNo: 'ORD-CAN-001',
+      orderedAt: '2026-08-01',
+      channel: 'direct',
+      subtotalTaxIncluded: 8_800,
+      taxAmount: 800,
+      paymentStatus: 'paid',
+      refundStatus: 'none',
+    });
+    createOrder(db, {
+      orderNo: 'ORD-CAN-002',
+      orderedAt: '2026-08-15',
+      channel: 'direct',
+      subtotalTaxIncluded: 3_300,
+      taxAmount: 300,
+      paymentStatus: 'cancelled',
+      refundStatus: 'none',
+    });
+    const [aug] = monthlySummary(db, '2026-08');
+    expect(aug).toBeDefined();
+    expect(aug!.cancelledAmount).toBe(3_300);
+    // cancelled は paymentStatus !== 'paid' なので uncollectedAmount にも計上される(後方互換)
+    expect(aug!.uncollectedAmount).toBe(3_300);
+    // refundStatus が 'none' なので refundAmount は 0
+    expect(aug!.refundAmount).toBe(0);
+    // salesTaxIncluded・orderCount は全注文を含む
+    expect(aug!.salesTaxIncluded).toBe(12_100);
+    expect(aug!.orderCount).toBe(2);
     db.close();
   });
 });
