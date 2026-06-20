@@ -15,6 +15,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { openDb, type DB } from '../db/connection.js';
 import { migrate } from '../db/migrate.js';
+import { writeAudit } from '../audit.js';
 
 export type BackupKind = 'manual' | 'auto' | 'pre_restore';
 export type RestoreTestResult = 'success' | 'failure';
@@ -148,14 +149,19 @@ export function createBackup(
   const sha256 = sha256File(backupPath);
   const db = openDb({ filename: sourceDbPath });
   try {
-    const row = db
-      .prepare(
-        `INSERT INTO backup_history (file_path, sha256, size_bytes, encrypted, kind, note)
-         VALUES (?, ?, ?, ?, ?, ?)
-         RETURNING *`,
-      )
-      .get(backupPath, sha256, sizeBytes, 1, options.kind ?? 'manual', options.note ?? null) as BackupHistoryRow;
-    return mapBackupHistory(row);
+    const entry = db.transaction((): BackupHistoryEntry => {
+      const row = db
+        .prepare(
+          `INSERT INTO backup_history (file_path, sha256, size_bytes, encrypted, kind, note)
+           VALUES (?, ?, ?, ?, ?, ?)
+           RETURNING *`,
+        )
+        .get(backupPath, sha256, sizeBytes, 1, options.kind ?? 'manual', options.note ?? null) as BackupHistoryRow;
+      const mapped = mapBackupHistory(row);
+      writeAudit(db, { action: 'create', entityType: 'backup', entityId: mapped.id, after: mapped });
+      return mapped;
+    })();
+    return entry;
   } finally {
     db.close();
   }
@@ -283,7 +289,12 @@ function parseBackupFile(path: string): ParsedBackupFile {
     throw new Error('invalid backup file');
   }
   const headerBytes = contents.subarray(headerStart, headerEnd);
-  const header = JSON.parse(headerBytes.toString('utf8')) as BackupHeader;
+  let header: BackupHeader;
+  try {
+    header = JSON.parse(headerBytes.toString('utf8')) as BackupHeader;
+  } catch {
+    throw new Error('invalid backup file');
+  }
   validateHeader(header);
   return {
     header,
@@ -388,22 +399,27 @@ function recordRestoreTest(
 
   const db = openDb({ filename: sourceDbPath });
   try {
-    const row = db
-      .prepare(
-        `INSERT INTO restore_test_logs
-          (backup_id, backup_file, result, integrity_check, restored_row_counts, message)
-         VALUES (?, ?, ?, ?, ?, ?)
-         RETURNING *`,
-      )
-      .get(
-        input.backupId,
-        input.backupFile,
-        input.result,
-        input.integrityCheck,
-        input.restoredRowCounts ? JSON.stringify(input.restoredRowCounts) : null,
-        input.message,
-      ) as RestoreTestLogRow;
-    return mapRestoreTestLog(row);
+    const entry = db.transaction((): RestoreTestLog => {
+      const row = db
+        .prepare(
+          `INSERT INTO restore_test_logs
+            (backup_id, backup_file, result, integrity_check, restored_row_counts, message)
+           VALUES (?, ?, ?, ?, ?, ?)
+           RETURNING *`,
+        )
+        .get(
+          input.backupId,
+          input.backupFile,
+          input.result,
+          input.integrityCheck,
+          input.restoredRowCounts ? JSON.stringify(input.restoredRowCounts) : null,
+          input.message,
+        ) as RestoreTestLogRow;
+      const mapped = mapRestoreTestLog(row);
+      writeAudit(db, { action: 'restore_test', entityType: 'backup_restore_test', entityId: mapped.id, after: mapped });
+      return mapped;
+    })();
+    return entry;
   } finally {
     db.close();
   }
