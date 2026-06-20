@@ -203,7 +203,12 @@ function seedOrder(
   return orderId;
 }
 
+const ALLOWED_TABLES = ['products'] as const;
+
 function hasColumn(db: DB, table: string, column: string): boolean {
+  if (!(ALLOWED_TABLES as readonly string[]).includes(table)) {
+    throw new Error('invalid table name');
+  }
   const rows = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
   return rows.some((row) => row.name === column);
 }
