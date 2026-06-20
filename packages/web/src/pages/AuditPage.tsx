@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 
 interface AuditEntry {
@@ -18,20 +18,25 @@ export function AuditPage() {
   const [action, setAction] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const load = () => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (entityType) params.set('entityType', entityType);
-    if (action) params.set('action', action);
-    const qs = params.toString();
-    api.get<AuditEntry[]>(`/api/audit${qs ? '?' + qs : ''}`)
-      .then(setEntries)
-      .catch((e: unknown) => setError(String(e)))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(load, [entityType, action]);
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (entityType) params.set('entityType', entityType);
+      if (action) params.set('action', action);
+      const qs = params.toString();
+      api.get<AuditEntry[]>(`/api/audit${qs ? '?' + qs : ''}`)
+        .then(setEntries)
+        .catch((e: unknown) => setError(String(e)))
+        .finally(() => setLoading(false));
+    }, 350);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [entityType, action]);
 
   return (
     <div>
