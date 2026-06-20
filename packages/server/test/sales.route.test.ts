@@ -158,6 +158,54 @@ describe('salesRoutes', () => {
     expect(res.statusCode).toBe(400);
     expect(res.json().error).toBe('invalid_payload');
   });
+
+  it('監査件数 characterization: create/update/delete それぞれ監査が1件ずつ記録される（二重記録なし）', async () => {
+    // POST create → audit action='create' が1件
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/sales',
+      payload: {
+        orderNo: 'AUDIT-001',
+        orderedAt: '2026-06-20',
+        channel: 'direct',
+        subtotalTaxIncluded: 10_000,
+        taxAmount: 909,
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    const orderId: number = created.json().id;
+
+    const afterCreate = db
+      .prepare("SELECT action FROM audit_logs WHERE entity_type='order' AND entity_id=? ORDER BY id ASC")
+      .all(String(orderId)) as { action: string }[];
+    expect(afterCreate.map((r) => r.action)).toEqual(['create']);
+
+    // PUT update → audit に 'update' が1件追加（合計2件）
+    const updated = await app.inject({
+      method: 'PUT',
+      url: `/api/sales/${orderId}`,
+      payload: { channel: 'market' },
+    });
+    expect(updated.statusCode).toBe(200);
+
+    const afterUpdate = db
+      .prepare("SELECT action FROM audit_logs WHERE entity_type='order' AND entity_id=? ORDER BY id ASC")
+      .all(String(orderId)) as { action: string }[];
+    expect(afterUpdate.map((r) => r.action)).toEqual(['create', 'update']);
+
+    // DELETE → audit に 'delete' が1件だけ追加（合計3件、DELETE二重記録なし）
+    const deleted = await app.inject({ method: 'DELETE', url: `/api/sales/${orderId}` });
+    expect(deleted.statusCode).toBe(204);
+
+    const afterDelete = db
+      .prepare("SELECT action FROM audit_logs WHERE entity_type='order' AND entity_id=? ORDER BY id ASC")
+      .all(String(orderId)) as { action: string }[];
+    expect(afterDelete.map((r) => r.action)).toEqual(['create', 'update', 'delete']);
+
+    // delete が2件になっていないことを明示的に確認
+    const deleteCount = afterDelete.filter((r) => r.action === 'delete').length;
+    expect(deleteCount).toBe(1);
+  });
 });
 
 function seedProduct(db: DB, id: number): void {
