@@ -98,6 +98,11 @@ describe('csv', () => {
       '\t=x',  // タブ+式
       '  =x',  // 空白+式
       "''=x",  // 多重クォート+式
+      // TAB/CR 始まり(数式メタ文字なし): needsFormulaGuard がガードし unguard で戻る
+      '\thello',
+      '\rhello',
+      '\t',
+      '\r',
     ];
     for (const v of guardTargets) {
       it(`guard対象が可逆: ${JSON.stringify(v)}`, () => {
@@ -106,10 +111,14 @@ describe('csv', () => {
     }
 
     // 未ガードデータ: serializeCsv→parseCsv で不変(データ破壊しない)
+    // 注意: "'\thello"(クォート+タブ+非数式)は "'\thello" と guardFormula("\thello")="'\thello"
+    // が同じ CSV 表現に衝突するため完全な可逆性を保証できない(設計上の制約)。
+    // needsFormulaGuard が守る範囲(先頭が TAB/CR)の値が優先されるため、
+    // 先頭クォート+TAB/CR の組み合わせはその後に数式メタ文字がなくとも剥がされる。
+    // 実用上の考慮: 先頭クォート+TAB/CR はセル値としてまれなケースであり、
+    // TAB/CR インジェクション対策の方が重要度が高い。
     const unguardedData = [
-      "'\thello",  // クォート+タブ+非式 → 旧実装で破壊されていたケース
-      "'\rfoo",    // クォート+CR+非式
-      "'hello",    // クォート+文字(非式)
+      "'hello",    // クォート+文字(非式・非TAB/CR) → 保護される
       'hello',     // 普通の文字列
       '',          // 空文字
       "'",         // 単独クォート

@@ -23,16 +23,14 @@ function guardFormula(value: string): string {
 }
 
 /**
- * guardFormula の逆操作。
- * guardFormula は `FORMULA_META` にマッチするか TAB/CR で始まる値に先頭 `'` を付ける。
- * ただし逆操作は「先頭 `'` を除いた残りが FORMULA_META にマッチする場合のみ剥がす」とする。
- * これにより、`'\thello`(ユーザー入力のクォート+タブ+非数式)のような先頭クォートを
- * 誤って剥がすデータ破損を防ぐ。TAB/CR のみで始まりその後に数式メタ文字が無い値は
- * guard されるが unguard されない(FORMULA_META に引っかからないため)という制約があるが、
- * そのような値はフォーミュラインジェクション対象外で実用上問題ない。
+ * guardFormula の厳密な逆操作。
+ * guardFormula は needsFormulaGuard(value) が真のとき先頭に `'` を1個付ける。
+ * よって逆は「先頭 `'` を除いた残りが needsFormulaGuard でマッチする場合のみ剥がす」。
+ * これにより TAB/CR 始まりガードも正しく剥がれ、`'hello` 等の正当な先頭クォートは
+ * 手を触れない(needsFormulaGuard("hello") = false のため)。
  */
 function unguardFormula(value: string): string {
-  if (value.startsWith("'") && FORMULA_META.test(value.slice(1))) {
+  if (value.startsWith("'") && needsFormulaGuard(value.slice(1))) {
     return value.slice(1);
   }
   return value;
