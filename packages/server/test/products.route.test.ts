@@ -149,4 +149,31 @@ describe('productRoutes', () => {
     const invalidId = await app.inject({ method: 'GET', url: '/api/products/not-a-number' });
     expect(invalidId.statusCode).toBe(400);
   });
+
+  it('rejects price exceeding 1,000,000,000 (ADR-products intentional strictness)', async () => {
+    const overLimit = await app.inject({
+      method: 'POST',
+      url: '/api/products',
+      payload: {
+        sku: 'OVER-LIMIT-001',
+        title: '価格上限超過テスト',
+        productType: 'download',
+        priceTaxIncluded: 1_000_000_001,
+      },
+    });
+    expect(overLimit.statusCode).toBe(400);
+    expect(overLimit.json().message).toMatch(/integer yen/);
+
+    const atLimit = await app.inject({
+      method: 'POST',
+      url: '/api/products',
+      payload: {
+        sku: 'AT-LIMIT-001',
+        title: '価格上限ちょうど',
+        productType: 'download',
+        priceTaxIncluded: 1_000_000_000,
+      },
+    });
+    expect(atLimit.statusCode).toBe(201);
+  });
 });
