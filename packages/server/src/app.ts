@@ -19,6 +19,7 @@ import { taxReportRoutes } from './routes/tax-report.js';
 import { agendaRoutes } from './routes/agenda.js';
 import { invoiceRoutes } from './routes/invoices.js';
 import { legalRoutes } from './routes/legal.js';
+import { quotesRoutes } from './routes/quotes.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -58,6 +59,7 @@ export function buildApp(config: ServerConfig, db?: DB): FastifyInstance {
   app.register(agendaRoutes);
   app.register(invoiceRoutes);
   app.register(legalRoutes);
+  app.register(quotesRoutes);
 
   // ビルド済みSPAがあれば静的配信(オフライン動作)。無ければAPIのみ。
   if (existsSync(config.webDistDir)) {

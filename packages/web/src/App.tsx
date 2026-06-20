@@ -7,6 +7,7 @@ const NAV: ReadonlyArray<{ to: string; label: string; end?: boolean }> = [
   { to: '/checklist', label: 'チェックリスト' },
   { to: '/products', label: '商品管理' },
   { to: '/sales', label: '売上・請求' },
+  { to: '/quotes', label: '見積書' },
   { to: '/expenses', label: '経費管理' },
   { to: '/documents', label: '文書・規約' },
   { to: '/customers', label: '顧客・同意' },

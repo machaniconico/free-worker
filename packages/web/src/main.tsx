@@ -17,6 +17,7 @@ import { ContentPage } from './pages/ContentPage.js';
 import { AuditPage } from './pages/AuditPage.js';
 import { TaxReportPage } from './pages/TaxReportPage.js';
 import { InvoicePrintPage } from './pages/InvoicePrintPage.js';
+import { QuotesPage } from './pages/QuotesPage.js';
 import './styles.css';
 
 const router = createBrowserRouter([
@@ -37,6 +38,7 @@ const router = createBrowserRouter([
       { path: 'content', element: <ContentPage /> },
       { path: 'audit', element: <AuditPage /> },
       { path: 'tax', element: <TaxReportPage /> },
+      { path: 'quotes', element: <QuotesPage /> },
       { path: 'invoice/:orderId', element: <InvoicePrintPage /> },
       { path: 'settings', element: <SettingsPage /> },
     ],
