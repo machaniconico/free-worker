@@ -42,3 +42,21 @@ export function cellToNullableInteger(value: string | undefined, field: string):
   if (!value?.trim()) return null;
   return cellToInteger(value, field);
 }
+
+/** バリデーション失敗を型付きエラーコード付きで表す。message は requireText と同一に保つ（既存テスト非破壊）。 */
+export class ValidationError extends Error {
+  constructor(
+    public readonly field: string,
+    public readonly code: string,
+  ) {
+    super(`${field} is required`);
+    this.name = 'ValidationError';
+  }
+}
+
+/** requireText のコード付き版。空なら ValidationError(field, code) を投げる。message は requireText と同一。 */
+export function requireTextCoded(value: string | null | undefined, field: string, code: string): string {
+  const text = nullableText(value);
+  if (!text) throw new ValidationError(field, code);
+  return text;
+}

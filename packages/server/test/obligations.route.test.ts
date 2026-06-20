@@ -73,4 +73,129 @@ describe('obligationRoutes', () => {
     expect(res.statusCode).toBe(400);
     expect(res.json().error).toBe('title_required');
   });
+
+  it('監査件数: CRUD で audit_logs に各1件ずつ記録される(二重記録なし)', async () => {
+    // POST → create
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/obligations',
+      payload: { category: '税務', title: '消費税申告' },
+    });
+    expect(created.statusCode).toBe(201);
+    const id = created.json().id as number;
+
+    const auditAfterCreate = db
+      .prepare("SELECT action FROM audit_logs WHERE entity_type='obligation' AND entity_id=? ORDER BY id ASC")
+      .all(String(id))
+      .map((r) => (r as { action: string }).action);
+    expect(auditAfterCreate).toEqual(['create']);
+
+    // PUT → update
+    await app.inject({
+      method: 'PUT',
+      url: `/api/obligations/${id}`,
+      payload: { title: '消費税申告(修正)' },
+    });
+    const auditAfterPut = db
+      .prepare("SELECT action FROM audit_logs WHERE entity_type='obligation' AND entity_id=? ORDER BY id ASC")
+      .all(String(id))
+      .map((r) => (r as { action: string }).action);
+    expect(auditAfterPut).toEqual(['create', 'update']);
+
+    // PATCH /:id/status → update
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/obligations/${id}/status`,
+      payload: { status: '完了' },
+    });
+    const auditAfterPatch = db
+      .prepare("SELECT action FROM audit_logs WHERE entity_type='obligation' AND entity_id=? ORDER BY id ASC")
+      .all(String(id))
+      .map((r) => (r as { action: string }).action);
+    expect(auditAfterPatch).toEqual(['create', 'update', 'update']);
+
+    // DELETE → delete
+    await app.inject({ method: 'DELETE', url: `/api/obligations/${id}` });
+    const auditAfterDelete = db
+      .prepare("SELECT action FROM audit_logs WHERE entity_type='obligation' AND entity_id=? ORDER BY id ASC")
+      .all(String(id))
+      .map((r) => (r as { action: string }).action);
+    expect(auditAfterDelete).toEqual(['create', 'update', 'update', 'delete']);
+  });
+
+  it('エラーコード契約: POST {} → category_required', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/obligations', payload: {} });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe('category_required');
+  });
+
+  it('エラーコード契約: POST {category} → title_required', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/obligations', payload: { category: '税務' } });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe('title_required');
+  });
+
+  it('エラーコード契約: PUT 既存ID に {title:""} → title_required', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/obligations',
+      payload: { category: '税務', title: '消費税申告' },
+    });
+    const id = created.json().id as number;
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/obligations/${id}`,
+      payload: { title: '' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe('title_required');
+  });
+
+  it('エラーコード契約: PUT 既存ID に {category:""} → category_required', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/obligations',
+      payload: { category: '税務', title: '消費税申告' },
+    });
+    const id = created.json().id as number;
+    const res = await app.inject({
+      method: 'PUT',
+      url: `/api/obligations/${id}`,
+      payload: { category: '' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe('category_required');
+  });
+
+  it('エラーコード契約: PATCH /:id/status に {} → status_required', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/obligations',
+      payload: { category: '税務', title: '消費税申告' },
+    });
+    const id = created.json().id as number;
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/obligations/${id}/status`,
+      payload: {},
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe('status_required');
+  });
+
+  it('エラーコード契約: PATCH /:id/status に {status:"  "} → status_required', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/obligations',
+      payload: { category: '税務', title: '消費税申告' },
+    });
+    const id = created.json().id as number;
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/obligations/${id}/status`,
+      payload: { status: '  ' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toBe('status_required');
+  });
 });
